@@ -70,17 +70,26 @@ def coletar_dados_acao(ticker):
             
             # 2. Demonstrações financeiras
             try:
-                dados['income_statement'] = acao.income_stmt.to_dict()
+                if hasattr(acao, "income_stmt"):
+                    dados['income_statement'] = acao.income_stmt.to_dict()
+                else:
+                    dados['income_statement'] = {}
             except:
                 dados['income_statement'] = {}
                 
             try:
-                dados['balance_sheet'] = acao.balance_sheet.to_dict()
+                if hasattr(acao, "balance_sheet"):
+                    dados['balance_sheet'] = acao.balance_sheet.to_dict()
+                else:
+                    dados['balance_sheet'] = {}
             except:
                 dados['balance_sheet'] = {}
                 
             try:
-                dados['cash_flow'] = acao.cashflow.to_dict()
+                if hasattr(acao, "cashflow"):
+                    dados['cash_flow'] = acao.cashflow.to_dict()
+                else:
+                    dados['cash_flow'] = {}
             except:
                 dados['cash_flow'] = {}
             
@@ -89,21 +98,22 @@ def coletar_dados_acao(ticker):
             start_date = end_date - timedelta(days=2*365)
             try:
                 hist = acao.history(start=start_date, end=end_date, interval="1d")
-                dados['historical'] = hist.to_dict('records')
+                dados['historical'] = hist.reset_index().to_dict('records')
             except:
                 dados['historical'] = []
             
             # 4. Dividendos
             try:
-                dividends = acao.dividends.to_dict()
-                dados['dividends'] = dividends
+                dividends = acao.dividends
+                dados['dividends'] = dividends.reset_index().to_dict('records') if hasattr(dividends, "reset_index") else {}
             except:
                 dados['dividends'] = {}
             
             # Salvar dados em arquivo JSON
             arquivo = os.path.join(DATA_DIR, f"{ticker.replace('.', '_')}.json")
+            # Para garantir que o JSON seja válido, use ensure_ascii=False e indent=2
             with open(arquivo, 'w', encoding='utf-8') as f:
-                json.dump(dados, f, default=str)
+                json.dump(dados, f, ensure_ascii=False, indent=2)
             
             return dados
     except Exception as e:
@@ -119,51 +129,41 @@ def obter_lista_acoes():
             with open(arquivo_lista, 'r', encoding='utf-8') as f:
                 return json.load(f)
         
-        # Tentativa de obter composição do Ibovespa via yfinance
-        ibov = yf.Ticker("^BVSP")
-        ibov_components = ibov.components
-        
-        if ibov_components is not None and len(ibov_components) > 0:
-            # Adicionar sufixo .SA para ações brasileiras
-            acoes = [ticker + ".SA" for ticker in ibov_components]
-        else:
-            # Lista manual de ações do Ibovespa caso a API não retorne
-            acoes_ibov = [
-                "ABEV3.SA", "ALPA4.SA", "AMER3.SA", "ASAI3.SA", "AZUL4.SA", 
-                "B3SA3.SA", "BBAS3.SA", "BBDC3.SA", "BBDC4.SA", "BBSE3.SA", 
-                "BEEF3.SA", "BPAC11.SA", "BRAP4.SA", "BRFS3.SA", "BRKM5.SA", 
-                "CASH3.SA", "CCRO3.SA", "CIEL3.SA", "CMIG4.SA", "CMIN3.SA", 
-                "COGN3.SA", "CPFE3.SA", "CPLE6.SA", "CRFB3.SA", "CSAN3.SA", 
-                "CSNA3.SA", "CVCB3.SA", "CYRE3.SA", "DXCO3.SA", "EGIE3.SA", 
-                "ELET3.SA", "ELET6.SA", "EMBR3.SA", "ENEV3.SA", "ENGI11.SA", 
-                "EQTL3.SA", "EZTC3.SA", "FLRY3.SA", "GGBR4.SA", "GOAU4.SA", 
-                "GOLL4.SA", "HAPV3.SA", "HYPE3.SA", "IGTI11.SA", "IRBR3.SA", 
-                "ITSA4.SA", "ITUB4.SA", "JBSS3.SA", "KLBN11.SA", "LREN3.SA", 
-                "LWSA3.SA", "MGLU3.SA", "MRFG3.SA", "MRVE3.SA", "MULT3.SA", 
-                "NTCO3.SA", "PCAR3.SA", "PETR3.SA", "PETR4.SA", "PETZ3.SA", 
-                "PRIO3.SA", "RADL3.SA", "RAIL3.SA", "RAIZ4.SA", "RDOR3.SA", 
-                "RENT3.SA", "RRRP3.SA", "SANB11.SA", "SBSP3.SA", "SLCE3.SA", 
-                "SMTO3.SA", "SOMA3.SA", "SUZB3.SA", "TAEE11.SA", "TIMS3.SA", 
-                "TOTS3.SA", "UGPA3.SA", "USIM5.SA", "VALE3.SA", "VBBR3.SA", 
-                "VIIA3.SA", "VIVT3.SA", "WEGE3.SA", "YDUQ3.SA"
-            ]
-            
-            # Adicionar outras ações relevantes fora do Ibovespa
-            outras_acoes = [
-                "AESB3.SA", "AURE3.SA", "AZEV4.SA", "BMGB4.SA", "BRSR6.SA",
-                "CEAB3.SA", "CGAS5.SA", "CSMG3.SA", "CXSE3.SA", "DIRR3.SA",
-                "EVEN3.SA", "FESA4.SA", "FRAS3.SA", "GRND3.SA", "HBOR3.SA",
-                "JHSF3.SA", "KEPL3.SA", "LOGG3.SA", "MDIA3.SA", "MOVI3.SA",
-                "ODPV3.SA", "POMO4.SA", "POSI3.SA", "PTBL3.SA", "QUAL3.SA",
-                "ROMI3.SA", "SAPR11.SA", "SEER3.SA", "TASA4.SA", "TGMA3.SA",
-                "TUPY3.SA", "VULC3.SA", "WIZS3.SA"
-            ]
-            
-            acoes = acoes_ibov + outras_acoes
-        
-        # Salvar lista de ações
+        # Não existe mais o atributo components, então vamos direto para a lista manual
+        acoes_ibov = [
+            "ABEV3.SA", "ALPA4.SA", "AMER3.SA", "ASAI3.SA", "AZUL4.SA", 
+            "B3SA3.SA", "BBAS3.SA", "BBDC3.SA", "BBDC4.SA", "BBSE3.SA", 
+            "BEEF3.SA", "BPAC11.SA", "BRAP4.SA", "BRFS3.SA", "BRKM5.SA", 
+            "CASH3.SA", "CCRO3.SA", "CIEL3.SA", "CMIG4.SA", "CMIN3.SA", 
+            "COGN3.SA", "CPFE3.SA", "CPLE6.SA", "CRFB3.SA", "CSAN3.SA", 
+            "CSNA3.SA", "CVCB3.SA", "CYRE3.SA", "DXCO3.SA", "EGIE3.SA", 
+            "ELET3.SA", "ELET6.SA", "EMBR3.SA", "ENEV3.SA", "ENGI11.SA", 
+            "EQTL3.SA", "EZTC3.SA", "FLRY3.SA", "GGBR4.SA", "GOAU4.SA", 
+            "GOLL4.SA", "HAPV3.SA", "HYPE3.SA", "IGTI11.SA", "IRBR3.SA", 
+            "ITSA4.SA", "ITUB4.SA", "JBSS3.SA", "KLBN11.SA", "LREN3.SA", 
+            "LWSA3.SA", "MGLU3.SA", "MRFG3.SA", "MRVE3.SA", "MULT3.SA", 
+            "NTCO3.SA", "PCAR3.SA", "PETR3.SA", "PETR4.SA", "PETZ3.SA", 
+            "PRIO3.SA", "RADL3.SA", "RAIL3.SA", "RAIZ4.SA", "RDOR3.SA", 
+            "RENT3.SA", "RRRP3.SA", "SANB11.SA", "SBSP3.SA", "SLCE3.SA", 
+            "SMTO3.SA", "SOMA3.SA", "SUZB3.SA", "TAEE11.SA", "TIMS3.SA", 
+            "TOTS3.SA", "UGPA3.SA", "USIM5.SA", "VALE3.SA", "VBBR3.SA", 
+            "VIIA3.SA", "VIVT3.SA", "WEGE3.SA", "YDUQ3.SA"
+        ]
+
+        outras_acoes = [
+            "AESB3.SA", "AURE3.SA", "AZEV4.SA", "BMGB4.SA", "BRSR6.SA",
+            "CEAB3.SA", "CGAS5.SA", "CSMG3.SA", "CXSE3.SA", "DIRR3.SA",
+            "EVEN3.SA", "FESA4.SA", "FRAS3.SA", "GRND3.SA", "HBOR3.SA",
+            "JHSF3.SA", "KEPL3.SA", "LOGG3.SA", "MDIA3.SA", "MOVI3.SA",
+            "ODPV3.SA", "POMO4.SA", "POSI3.SA", "PTBL3.SA", "QUAL3.SA",
+            "ROMI3.SA", "SAPR11.SA", "SEER3.SA", "TASA4.SA", "TGMA3.SA",
+            "TUPY3.SA", "VULC3.SA", "WIZS3.SA"
+        ]
+
+        acoes = acoes_ibov + outras_acoes
+
         with open(arquivo_lista, 'w', encoding='utf-8') as f:
-            json.dump(acoes, f)
+            json.dump(acoes, f, ensure_ascii=False, indent=2)
         
         return acoes
     except Exception as e:
@@ -174,6 +174,8 @@ def obter_lista_acoes():
             "ABEV3.SA", "WEGE3.SA", "RENT3.SA", "BBAS3.SA", "SUZB3.SA"
         ]
         return acoes_fallback
+
+# ... o resto do seu código permanece o mesmo.
 
 def obter_dados_ibovespa():
     """Obtém dados históricos do Ibovespa para comparação"""
