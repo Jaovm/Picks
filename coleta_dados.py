@@ -29,11 +29,10 @@ logger = logging.getLogger(__name__)
 DATA_DIR = "dados"
 os.makedirs(DATA_DIR, exist_ok=True)
 
-# Lista de ações brasileiras do Ibovespa
 def obter_lista_acoes():
     """Obtém a lista de ações do Ibovespa e outras ações relevantes do mercado brasileiro"""
     try:
-        # Tentativa de obter composição do Ibovespa via yfinance (não suportado, lista manual)
+        # Lista manual de ações do Ibovespa + outras relevantes
         acoes_ibov = [
             "ABEV3.SA", "ALPA4.SA", "AMER3.SA", "ASAI3.SA", "AZUL4.SA", 
             "B3SA3.SA", "BBAS3.SA", "BBDC3.SA", "BBDC4.SA", "BBSE3.SA", 
@@ -65,11 +64,10 @@ def obter_lista_acoes():
         return acoes_ibov + outras_acoes
     except Exception as e:
         logger.error(f"Erro ao obter lista de ações: {e}")
-        acoes_fallback = [
+        return [
             "PETR4.SA", "VALE3.SA", "ITUB4.SA", "BBDC4.SA", "B3SA3.SA",
             "ABEV3.SA", "WEGE3.SA", "RENT3.SA", "BBAS3.SA", "SUZB3.SA"
         ]
-        return acoes_fallback
 
 def obter_dados_fundamentalistas(ticker):
     """Obtém dados fundamentalistas para um ticker específico"""
