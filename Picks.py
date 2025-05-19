@@ -264,25 +264,117 @@ def calcular_metricas_fundamentalistas(dados):
         
         # 1. Métricas de Lucratividade
         # ROE (Retorno sobre Patrimônio)
-        if 'netIncome' in info and 'totalStockholderEquity' in info and info['totalStockholderEquity'] != 0:
-            metricas['ROE'] = (info['netIncome'] / info['totalStockholderEquity']) * 100
-        else:
+        try:
+            # Método 1: Usando info diretamente
+            if 'netIncome' in info and 'totalStockholderEquity' in info and info['totalStockholderEquity'] != 0:
+                metricas['ROE'] = (info['netIncome'] / info['totalStockholderEquity']) * 100
+            # Método 2: Usando campos alternativos
+            elif 'returnOnEquity' in info:
+                metricas['ROE'] = info['returnOnEquity'] * 100
+            # Método 3: Calculando a partir das demonstrações financeiras
+            elif isinstance(income_stmt, list) and isinstance(balance, list) and len(income_stmt) > 0 and len(balance) > 0:
+                # Tentar encontrar lucro líquido e patrimônio líquido nas demonstrações
+                lucro_liquido = None
+                patrimonio_liquido = None
+                
+                # Procurar em income_stmt
+                for item in income_stmt:
+                    if 'Net Income' in item or 'NetIncome' in item:
+                        lucro_liquido = item.get('Net Income', item.get('NetIncome'))
+                        break
+                
+                # Procurar em balance
+                for item in balance:
+                    if 'Total Stockholder Equity' in item or 'TotalStockholderEquity' in item:
+                        patrimonio_liquido = item.get('Total Stockholder Equity', item.get('TotalStockholderEquity'))
+                        break
+                
+                if lucro_liquido is not None and patrimonio_liquido is not None and float(patrimonio_liquido) != 0:
+                    metricas['ROE'] = (float(lucro_liquido) / float(patrimonio_liquido)) * 100
+                else:
+                    metricas['ROE'] = None
+            else:
+                metricas['ROE'] = None
+        except Exception as e:
+            logger.warning(f"Erro ao calcular ROE: {e}")
             metricas['ROE'] = None
         
         # ROIC (Retorno sobre Capital Investido)
-        if 'ebit' in info and 'totalAssets' in info and 'totalCurrentLiabilities' in info:
-            capital_investido = info['totalAssets'] - info['totalCurrentLiabilities']
-            if capital_investido != 0:
-                metricas['ROIC'] = (info['ebit'] * (1 - 0.34)) / capital_investido * 100  # Considerando alíquota de 34%
+        try:
+            # Método 1: Usando info diretamente
+            if 'ebit' in info and 'totalAssets' in info and 'totalCurrentLiabilities' in info:
+                capital_investido = info['totalAssets'] - info['totalCurrentLiabilities']
+                if capital_investido != 0:
+                    metricas['ROIC'] = (info['ebit'] * (1 - 0.34)) / capital_investido * 100  # Considerando alíquota de 34%
+                else:
+                    metricas['ROIC'] = None
+            # Método 2: Calculando a partir das demonstrações financeiras
+            elif isinstance(income_stmt, list) and isinstance(balance, list) and len(income_stmt) > 0 and len(balance) > 0:
+                # Tentar encontrar EBIT, ativos totais e passivos circulantes nas demonstrações
+                ebit = None
+                ativos_totais = None
+                passivos_circulantes = None
+                
+                # Procurar em income_stmt
+                for item in income_stmt:
+                    if 'EBIT' in item or 'OperatingIncome' in item:
+                        ebit = item.get('EBIT', item.get('OperatingIncome'))
+                        break
+                
+                # Procurar em balance
+                for item in balance:
+                    if 'Total Assets' in item or 'TotalAssets' in item:
+                        ativos_totais = item.get('Total Assets', item.get('TotalAssets'))
+                    if 'Total Current Liabilities' in item or 'TotalCurrentLiabilities' in item:
+                        passivos_circulantes = item.get('Total Current Liabilities', item.get('TotalCurrentLiabilities'))
+                    if ativos_totais is not None and passivos_circulantes is not None:
+                        break
+                
+                if ebit is not None and ativos_totais is not None and passivos_circulantes is not None:
+                    capital_investido = float(ativos_totais) - float(passivos_circulantes)
+                    if capital_investido != 0:
+                        metricas['ROIC'] = (float(ebit) * (1 - 0.34)) / capital_investido * 100
+                    else:
+                        metricas['ROIC'] = None
+                else:
+                    metricas['ROIC'] = None
             else:
                 metricas['ROIC'] = None
-        else:
+        except Exception as e:
+            logger.warning(f"Erro ao calcular ROIC: {e}")
             metricas['ROIC'] = None
         
         # Margem Líquida
-        if 'netIncome' in info and 'totalRevenue' in info and info['totalRevenue'] != 0:
-            metricas['MargemLiquida'] = (info['netIncome'] / info['totalRevenue']) * 100
-        else:
+        try:
+            # Método 1: Usando info diretamente
+            if 'netIncome' in info and 'totalRevenue' in info and info['totalRevenue'] != 0:
+                metricas['MargemLiquida'] = (info['netIncome'] / info['totalRevenue']) * 100
+            # Método 2: Usando campos alternativos
+            elif 'profitMargins' in info:
+                metricas['MargemLiquida'] = info['profitMargins'] * 100
+            # Método 3: Calculando a partir das demonstrações financeiras
+            elif isinstance(income_stmt, list) and len(income_stmt) > 0:
+                # Tentar encontrar lucro líquido e receita total nas demonstrações
+                lucro_liquido = None
+                receita_total = None
+                
+                # Procurar em income_stmt
+                for item in income_stmt:
+                    if 'Net Income' in item or 'NetIncome' in item:
+                        lucro_liquido = item.get('Net Income', item.get('NetIncome'))
+                    if 'Total Revenue' in item or 'TotalRevenue' in item:
+                        receita_total = item.get('Total Revenue', item.get('TotalRevenue'))
+                    if lucro_liquido is not None and receita_total is not None:
+                        break
+                
+                if lucro_liquido is not None and receita_total is not None and float(receita_total) != 0:
+                    metricas['MargemLiquida'] = (float(lucro_liquido) / float(receita_total)) * 100
+                else:
+                    metricas['MargemLiquida'] = None
+            else:
+                metricas['MargemLiquida'] = None
+        except Exception as e:
+            logger.warning(f"Erro ao calcular Margem Líquida: {e}")
             metricas['MargemLiquida'] = None
         
         # 2. Métricas de Avaliação
@@ -300,9 +392,36 @@ def calcular_metricas_fundamentalistas(dados):
         
         # 3. Métricas de Saúde Financeira
         # Dívida/Patrimônio
-        if 'totalDebt' in info and 'totalStockholderEquity' in info and info['totalStockholderEquity'] != 0:
-            metricas['DividaPatrimonio'] = info['totalDebt'] / info['totalStockholderEquity']
-        else:
+        try:
+            # Método 1: Usando info diretamente
+            if 'totalDebt' in info and 'totalStockholderEquity' in info and info['totalStockholderEquity'] != 0:
+                metricas['DividaPatrimonio'] = info['totalDebt'] / info['totalStockholderEquity']
+            # Método 2: Usando campos alternativos
+            elif 'debtToEquity' in info:
+                metricas['DividaPatrimonio'] = info['debtToEquity'] / 100  # Normalmente é reportado em percentual
+            # Método 3: Calculando a partir das demonstrações financeiras
+            elif isinstance(balance, list) and len(balance) > 0:
+                # Tentar encontrar dívida total e patrimônio líquido nas demonstrações
+                divida_total = None
+                patrimonio_liquido = None
+                
+                # Procurar em balance
+                for item in balance:
+                    if 'Total Debt' in item or 'TotalDebt' in item or 'Long Term Debt' in item:
+                        divida_total = item.get('Total Debt', item.get('TotalDebt', item.get('Long Term Debt')))
+                    if 'Total Stockholder Equity' in item or 'TotalStockholderEquity' in item:
+                        patrimonio_liquido = item.get('Total Stockholder Equity', item.get('TotalStockholderEquity'))
+                    if divida_total is not None and patrimonio_liquido is not None:
+                        break
+                
+                if divida_total is not None and patrimonio_liquido is not None and float(patrimonio_liquido) != 0:
+                    metricas['DividaPatrimonio'] = float(divida_total) / float(patrimonio_liquido)
+                else:
+                    metricas['DividaPatrimonio'] = None
+            else:
+                metricas['DividaPatrimonio'] = None
+        except Exception as e:
+            logger.warning(f"Erro ao calcular Dívida/Patrimônio: {e}")
             metricas['DividaPatrimonio'] = None
         
         # Liquidez Corrente
@@ -851,6 +970,21 @@ def obter_pesos_padrao():
         # seriam os 35% restantes
     }
 
+# Função para validar tickers inseridos pelo usuário
+def validar_ticker(ticker):
+    """Valida se o ticker está no formato correto para o mercado brasileiro"""
+    # Verifica se o ticker já tem o sufixo .SA
+    if ticker.endswith('.SA'):
+        return ticker
+    
+    # Verifica se o ticker está no formato padrão brasileiro (4 letras + 1 número)
+    padrao = re.compile(r'^[A-Z]{4}\d{1,2}$', re.IGNORECASE)
+    if padrao.match(ticker):
+        return f"{ticker.upper()}.SA"
+    
+    # Se não estiver em nenhum formato reconhecido, retorna None
+    return None
+
 # Interface do Streamlit
 def main():
     # Título e descrição
@@ -887,98 +1021,101 @@ def main():
     
     # Ajuste de pesos
     st.sidebar.subheader("Ajuste de Pesos dos Critérios")
-    mostrar_ajuste_pesos = st.sidebar.checkbox("Personalizar Pesos", value=False)
+    st.sidebar.markdown("Defina a importância de cada critério (1-10)")
     
     # Obter pesos padrão
-    pesos = obter_pesos_padrao()
+    pesos_padrao = obter_pesos_padrao()
     
     # Permitir ajuste de pesos
-    if mostrar_ajuste_pesos:
-        st.sidebar.markdown("**Lucratividade (25%)**")
-        pesos['ROE'] = st.sidebar.slider("ROE (Retorno sobre Patrimônio)", 0, 10, 6)
-        pesos['ROIC'] = st.sidebar.slider("ROIC (Retorno sobre Capital Investido)", 0, 10, 6)
-        pesos['MargemLiquida'] = st.sidebar.slider("Margem Líquida", 0, 10, 7)
-        pesos['CrescimentoLucros'] = st.sidebar.slider("Crescimento de Lucros", 0, 10, 6)
-        
-        st.sidebar.markdown("**Avaliação (20%)**")
-        pesos['PL'] = st.sidebar.slider("P/L (Preço/Lucro)", 0, 10, 7)
-        pesos['PVP'] = st.sidebar.slider("P/VP (Preço/Valor Patrimonial)", 0, 10, 5)
-        pesos['EV_EBITDA'] = st.sidebar.slider("EV/EBITDA", 0, 10, 5)
-        pesos['DividendYield'] = st.sidebar.slider("Dividend Yield", 0, 10, 3)
-        
-        st.sidebar.markdown("**Saúde Financeira (20%)**")
-        pesos['DividaPatrimonio'] = st.sidebar.slider("Dívida/Patrimônio", 0, 10, 7)
-        pesos['LiquidezCorrente'] = st.sidebar.slider("Liquidez Corrente", 0, 10, 5)
-        pesos['Payout'] = st.sidebar.slider("Payout", 0, 10, 3)
+    pesos = {}
     
-    # Número de ações a analisar
-    num_acoes = st.sidebar.slider(
-        "Número de Ações a Analisar",
-        min_value=10,
-        max_value=100,
-        value=30,
-        step=10,
-        help="Selecione quantas ações serão analisadas (mais ações = mais tempo de processamento)"
-    )
-    
-    # Botão para iniciar análise
-    iniciar_analise = st.sidebar.button("Iniciar Análise")
-    
-    # Exibir informações sobre o cenário macroeconômico
-    st.subheader(f"Cenário Macroeconômico: {cenario}")
-    
-    col1, col2 = st.columns(2)
+    # Criar três colunas para organizar os sliders
+    col1, col2, col3 = st.sidebar.columns(3)
     
     with col1:
-        if cenario == "Expansão":
-            st.info("Crescimento econômico forte, inflação controlada. Favorece empresas cíclicas e de crescimento.")
-        elif cenario == "Desaceleração":
-            st.warning("Crescimento econômico em queda, inflação ainda presente. Favorece empresas de qualidade e setores defensivos.")
-        elif cenario == "Recessão":
-            st.error("Crescimento negativo, pressões deflacionárias. Favorece empresas com balanços sólidos e baixo endividamento.")
-        elif cenario == "Recuperação":
-            st.success("Retomada do crescimento após período de contração. Favorece empresas cíclicas de qualidade e setores mais sensíveis.")
+        st.markdown("**Lucratividade**")
+        pesos['ROE'] = st.slider("ROE", 1, 10, pesos_padrao['ROE'])
+        pesos['ROIC'] = st.slider("ROIC", 1, 10, pesos_padrao['ROIC'])
     
     with col2:
-        st.subheader(f"Perfil do Investidor: {perfil}")
-        if perfil == "Conservador":
-            st.info("Prioriza preservação de capital e renda. Preferência por empresas estáveis e pagadoras de dividendos.")
-        elif perfil == "Moderado":
-            st.info("Busca equilíbrio entre crescimento e segurança. Diversificação entre diferentes tipos de empresas.")
-        elif perfil == "Agressivo":
-            st.info("Foco em crescimento e valorização. Maior tolerância a risco e volatilidade.")
+        st.markdown("**Avaliação**")
+        pesos['PL'] = st.slider("P/L", 1, 10, pesos_padrao['PL'])
+        pesos['PVP'] = st.slider("P/VP", 1, 10, pesos_padrao['PVP'])
     
-    # Alocação sugerida
-    alocacao = sugerir_alocacao(perfil, cenario)
+    with col3:
+        st.markdown("**Saúde Financeira**")
+        pesos['DividaPatrimonio'] = st.slider("Dívida/Patrimônio", 1, 10, pesos_padrao['DividaPatrimonio'])
+        pesos['DividendYield'] = st.slider("Dividend Yield", 1, 10, pesos_padrao['DividendYield'])
     
-    # Gráfico de alocação sugerida
-    fig_alocacao = gerar_grafico_alocacao(
-        alocacao, 
-        f"Alocação Sugerida para Perfil {perfil} em Cenário de {cenario}"
+    # Outros pesos mantidos como padrão
+    for criterio, peso in pesos_padrao.items():
+        if criterio not in pesos:
+            pesos[criterio] = peso
+    
+    # Opção para selecionar modo de análise
+    st.sidebar.subheader("Modo de Análise")
+    modo_analise = st.sidebar.radio(
+        "Escolha o modo de análise:",
+        ["Automático (Top Ações)", "Carteira Personalizada"],
+        help="No modo automático, analisamos as melhores ações do mercado. No modo personalizado, você pode inserir os tickers da sua carteira."
     )
-    st.plotly_chart(fig_alocacao, use_container_width=True)
     
-    # Iniciar análise quando solicitado
-    if iniciar_analise:
+    # Número de ações a analisar (no modo automático)
+    num_acoes = 10
+    if modo_analise == "Automático (Top Ações)":
+        num_acoes = st.sidebar.slider(
+            "Número de ações a analisar",
+            min_value=5,
+            max_value=50,
+            value=10,
+            step=5,
+            help="Selecione quantas ações deseja analisar. Um número maior pode levar mais tempo para processar."
+        )
+    
+    # Campo para inserir tickers da carteira (no modo personalizado)
+    tickers_personalizados = []
+    if modo_analise == "Carteira Personalizada":
+        tickers_input = st.sidebar.text_area(
+            "Insira os tickers da sua carteira (um por linha)",
+            help="Exemplo: PETR4, VALE3, ITUB4, etc. Pode inserir com ou sem o sufixo .SA"
+        )
+        
+        if tickers_input:
+            # Processar os tickers inseridos
+            linhas = tickers_input.strip().split('\n')
+            for linha in linhas:
+                # Remover espaços e vírgulas
+                ticker_limpo = linha.strip().replace(',', '')
+                if ticker_limpo:
+                    ticker_validado = validar_ticker(ticker_limpo)
+                    if ticker_validado:
+                        tickers_personalizados.append(ticker_validado)
+    
+    # Botão para iniciar análise
+    if st.sidebar.button("Analisar Ações"):
         # Obter lista de ações
-        acoes = obter_lista_acoes()
+        if modo_analise == "Automático (Top Ações)":
+            acoes = obter_lista_acoes()
+            # Limitar ao número selecionado
+            acoes = acoes[:num_acoes]
+        else:
+            # Usar tickers personalizados
+            acoes = tickers_personalizados
+            if not acoes:
+                st.error("Por favor, insira pelo menos um ticker válido para análise.")
+                return
         
-        # Limitar ao número selecionado
-        acoes = acoes[:num_acoes]
-        
-        # Barra de progresso
+        # Mostrar progresso
         progress_bar = st.progress(0)
         status_text = st.empty()
         
         # Resultados
         resultados = []
         
-        # Analisar cada ação
+        # Processar cada ação
         for i, ticker in enumerate(acoes):
-            # Atualizar progresso
-            progress = (i + 1) / len(acoes)
-            progress_bar.progress(progress)
-            status_text.text(f"Analisando {ticker} ({i+1}/{len(acoes)})")
+            status_text.text(f"Analisando {ticker}... ({i+1}/{len(acoes)})")
+            progress_bar.progress((i+1)/len(acoes))
             
             # Carregar dados
             dados = carregar_dados_acao(ticker)
@@ -987,500 +1124,307 @@ def main():
                 # Calcular métricas
                 metricas = calcular_metricas_fundamentalistas(dados)
                 
-                if metricas:
-                    # Calcular pontuação
-                    pontuacoes, pontuacao_final = calcular_pontuacao(metricas, pesos)
-                    
-                    # Classificar ação
-                    categorias = classificar_acao(pontuacao_final, metricas)
-                    
-                    # Adicionar aos resultados
-                    resultados.append({
-                        'Ticker': ticker,
-                        'Nome': metricas.get('Nome', 'N/A'),
-                        'Setor': metricas.get('Setor', 'N/A'),
-                        'Metricas': metricas,
-                        'Pontuacoes': pontuacoes,
-                        'PontuacaoFinal': pontuacao_final,
-                        'Categorias': categorias
-                    })
+                # Calcular pontuação
+                pontuacao, pontuacao_final = calcular_pontuacao(metricas, pesos)
+                
+                # Classificar ação
+                categorias = classificar_acao(pontuacao_final, metricas)
+                
+                # Adicionar aos resultados
+                resultados.append({
+                    'Ticker': ticker,
+                    'Nome': metricas.get('Nome', 'N/A'),
+                    'Setor': metricas.get('Setor', 'N/A'),
+                    'Metricas': metricas,
+                    'Pontuacao': pontuacao,
+                    'PontuacaoFinal': pontuacao_final,
+                    'Categorias': categorias
+                })
         
         # Limpar barra de progresso e status
         progress_bar.empty()
         status_text.empty()
         
+        # Ordenar resultados por pontuação
+        resultados = sorted(resultados, key=lambda x: x['PontuacaoFinal'], reverse=True)
+        
         # Exibir resultados
-        if resultados:
-            st.subheader("Resultados da Análise")
+        st.header("Resultados da Análise")
+        
+        # Criar abas para diferentes visualizações
+        tab1, tab2, tab3, tab4 = st.tabs(["Ranking Geral", "Análise Detalhada", "Carteiras Recomendadas", "Alocação Sugerida"])
+        
+        with tab1:
+            st.subheader("Ranking das Ações Analisadas")
             
-            # Ordenar resultados por pontuação
-            resultados_ordenados = sorted(resultados, key=lambda x: x['PontuacaoFinal'], reverse=True)
+            # Criar dataframe para exibição
+            df_ranking = pd.DataFrame([
+                {
+                    'Ticker': r['Ticker'],
+                    'Nome': r['Nome'],
+                    'Setor': r['Setor'],
+                    'Pontuação': f"{r['PontuacaoFinal']:.2f}",
+                    'ROE': formatar_metrica(r['Metricas'].get('ROE'), "percentual"),
+                    'Div/Pat': formatar_metrica(r['Metricas'].get('DividaPatrimonio'), "decimal"),
+                    'P/L': formatar_metrica(r['Metricas'].get('PL'), "decimal"),
+                    'P/VP': formatar_metrica(r['Metricas'].get('PVP'), "decimal"),
+                    'DY': formatar_metrica(r['Metricas'].get('DividendYield'), "percentual"),
+                    'Categorias': ", ".join(r['Categorias'])
+                }
+                for r in resultados
+            ])
             
-            # Criar abas para diferentes visualizações
-            tab1, tab2, tab3, tab4 = st.tabs(["Ranking Geral", "Carteiras Recomendadas", "Análise por Setor", "Detalhes por Ação"])
+            # Exibir tabela
+            st.dataframe(df_ranking, use_container_width=True)
             
-            with tab1:
+            # Gráfico de pontuações
+            st.subheader("Comparativo de Pontuações")
+            
+            # Preparar dados para gráfico
+            df_pontuacoes = pd.DataFrame([
+                {'Ticker': r['Ticker'], 'Pontuação': r['PontuacaoFinal']}
+                for r in resultados
+            ])
+            
+            # Criar gráfico
+            fig = px.bar(
+                df_pontuacoes,
+                x='Ticker',
+                y='Pontuação',
+                title="Pontuação das Ações Analisadas",
+                color='Pontuação',
+                color_continuous_scale='RdYlGn',
+                range_y=[0, 10]
+            )
+            
+            fig.update_layout(
+                xaxis_title="Ticker",
+                yaxis_title="Pontuação (0-10)",
+                height=500
+            )
+            
+            st.plotly_chart(fig, use_container_width=True)
+        
+        with tab2:
+            st.subheader("Análise Detalhada por Ação")
+            
+            # Seletor de ação
+            ticker_selecionado = st.selectbox(
+                "Selecione uma ação para análise detalhada",
+                [r['Ticker'] for r in resultados],
+                format_func=lambda x: f"{x} - {next((r['Nome'] for r in resultados if r['Ticker'] == x), '')}"
+            )
+            
+            # Encontrar dados da ação selecionada
+            acao_selecionada = next((r for r in resultados if r['Ticker'] == ticker_selecionado), None)
+            
+            if acao_selecionada:
+                # Exibir informações básicas
+                col1, col2, col3 = st.columns(3)
+                
+                with col1:
+                    st.metric("Pontuação Final", f"{acao_selecionada['PontuacaoFinal']:.2f}/10")
+                
+                with col2:
+                    st.metric("Categorias", ", ".join(acao_selecionada['Categorias']))
+                
+                with col3:
+                    st.metric("Setor", acao_selecionada['Setor'])
+                
+                # Exibir métricas detalhadas
+                st.subheader("Métricas Fundamentalistas")
+                
+                # Organizar métricas em colunas
+                col1, col2, col3 = st.columns(3)
+                
+                with col1:
+                    st.markdown("**Lucratividade**")
+                    st.metric("ROE", formatar_metrica(acao_selecionada['Metricas'].get('ROE'), "percentual"))
+                    st.metric("ROIC", formatar_metrica(acao_selecionada['Metricas'].get('ROIC'), "percentual"))
+                    st.metric("Margem Líquida", formatar_metrica(acao_selecionada['Metricas'].get('MargemLiquida'), "percentual"))
+                    st.metric("Crescimento de Lucros", formatar_metrica(acao_selecionada['Metricas'].get('CrescimentoLucros'), "percentual"))
+                
+                with col2:
+                    st.markdown("**Avaliação**")
+                    st.metric("P/L", formatar_metrica(acao_selecionada['Metricas'].get('PL'), "decimal"))
+                    st.metric("P/VP", formatar_metrica(acao_selecionada['Metricas'].get('PVP'), "decimal"))
+                    st.metric("EV/EBITDA", formatar_metrica(acao_selecionada['Metricas'].get('EV_EBITDA'), "decimal"))
+                    st.metric("Dividend Yield", formatar_metrica(acao_selecionada['Metricas'].get('DividendYield'), "percentual"))
+                
+                with col3:
+                    st.markdown("**Saúde Financeira**")
+                    st.metric("Dívida/Patrimônio", formatar_metrica(acao_selecionada['Metricas'].get('DividaPatrimonio'), "decimal"))
+                    st.metric("Liquidez Corrente", formatar_metrica(acao_selecionada['Metricas'].get('LiquidezCorrente'), "decimal"))
+                    st.metric("Payout", formatar_metrica(acao_selecionada['Metricas'].get('Payout'), "percentual"))
+                    st.metric("Market Cap", formatar_metrica(acao_selecionada['Metricas'].get('MarketCap'), "inteiro"))
+                
+                # Gráficos de pontuação
+                st.subheader("Análise de Pontuação por Critério")
+                
+                # Gráfico de barras
+                fig_barras = gerar_grafico_pontuacao(
+                    acao_selecionada['Pontuacao'],
+                    f"Pontuação por Critério - {acao_selecionada['Ticker']}"
+                )
+                
+                # Gráfico radar
+                fig_radar = gerar_grafico_radar(
+                    acao_selecionada['Pontuacao'],
+                    f"Perfil de Pontuação - {acao_selecionada['Ticker']}"
+                )
+                
+                # Exibir gráficos lado a lado
+                col1, col2 = st.columns(2)
+                
+                with col1:
+                    st.plotly_chart(fig_barras, use_container_width=True)
+                
+                with col2:
+                    st.plotly_chart(fig_radar, use_container_width=True)
+        
+        with tab3:
+            st.subheader("Carteiras Recomendadas por Categoria")
+            
+            # Criar carteiras recomendadas para cada categoria
+            categorias_disponiveis = [
+                "Melhores Ações Brasileiras",
+                "Empresas Sólidas",
+                "Ações Defensivas",
+                "Ações Baratas"
+            ]
+            
+            # Verificar quais categorias têm ações suficientes
+            categorias_validas = []
+            for categoria in categorias_disponiveis:
+                acoes_categoria = [r for r in resultados if categoria in r['Categorias']]
+                if len(acoes_categoria) > 0:
+                    categorias_validas.append(categoria)
+            
+            # Seletor de categoria
+            categoria_selecionada = st.selectbox(
+                "Selecione uma categoria para ver a carteira recomendada",
+                categorias_validas
+            )
+            
+            # Criar carteira recomendada
+            carteira = criar_carteira_recomendada(resultados, categoria_selecionada, max_acoes=5)
+            
+            if carteira:
+                # Exibir carteira
+                st.markdown(f"**Carteira Recomendada - {categoria_selecionada}**")
+                
                 # Criar dataframe para exibição
-                df_ranking = pd.DataFrame([
+                df_carteira = pd.DataFrame([
                     {
                         'Ticker': r['Ticker'],
                         'Nome': r['Nome'],
                         'Setor': r['Setor'],
-                        'Pontuação': round(r['PontuacaoFinal'], 2),
-                        'Categorias': ', '.join(r['Categorias']),
-                        'P/L': formatar_metrica(r['Metricas'].get('PL'), 'decimal'),
-                        'P/VP': formatar_metrica(r['Metricas'].get('PVP'), 'decimal'),
-                        'ROE': formatar_metrica(r['Metricas'].get('ROE'), 'percentual'),
-                        'Div. Yield': formatar_metrica(r['Metricas'].get('DividendYield'), 'percentual'),
-                        'Dív/Pat': formatar_metrica(r['Metricas'].get('DividaPatrimonio'), 'decimal')
+                        'Pontuação': f"{r['PontuacaoFinal']:.2f}",
+                        'ROE': formatar_metrica(r['Metricas'].get('ROE'), "percentual"),
+                        'Div/Pat': formatar_metrica(r['Metricas'].get('DividaPatrimonio'), "decimal"),
+                        'P/L': formatar_metrica(r['Metricas'].get('PL'), "decimal"),
+                        'DY': formatar_metrica(r['Metricas'].get('DividendYield'), "percentual")
                     }
-                    for r in resultados_ordenados
+                    for r in carteira
                 ])
                 
                 # Exibir tabela
-                st.dataframe(df_ranking, use_container_width=True)
+                st.dataframe(df_carteira, use_container_width=True)
                 
-                # Gráfico de pontuações
-                pontuacoes_finais = {r['Ticker']: r['PontuacaoFinal'] for r in resultados_ordenados[:15]}
-                fig = px.bar(
-                    x=list(pontuacoes_finais.keys()),
-                    y=list(pontuacoes_finais.values()),
-                    title="Top 15 Ações por Pontuação",
-                    labels={'x': 'Ticker', 'y': 'Pontuação (0-10)'},
-                    color=list(pontuacoes_finais.values()),
-                    color_continuous_scale='RdYlGn'
-                )
-                st.plotly_chart(fig, use_container_width=True)
-            
-            with tab2:
-                # Criar carteiras recomendadas
-                st.subheader("Carteiras Recomendadas")
+                # Gráfico de composição da carteira
+                st.subheader("Composição da Carteira")
                 
-                # Melhores Ações Brasileiras
-                st.markdown("### 🏆 Melhores Ações Brasileiras")
-                carteira_melhores = criar_carteira_recomendada(resultados_ordenados, "Melhores Ações Brasileiras")
-                
-                if carteira_melhores:
-                    df_melhores = pd.DataFrame([
-                        {
-                            'Ticker': r['Ticker'],
-                            'Nome': r['Nome'],
-                            'Setor': r['Setor'],
-                            'Pontuação': round(r['PontuacaoFinal'], 2),
-                            'P/L': formatar_metrica(r['Metricas'].get('PL'), 'decimal'),
-                            'ROE': formatar_metrica(r['Metricas'].get('ROE'), 'percentual'),
-                            'Div. Yield': formatar_metrica(r['Metricas'].get('DividendYield'), 'percentual')
-                        }
-                        for r in carteira_melhores
-                    ])
-                    st.dataframe(df_melhores, use_container_width=True)
-                else:
-                    st.info("Nenhuma ação classificada nesta categoria.")
-                
-                # Empresas Sólidas
-                st.markdown("### 🏢 Empresas Sólidas do Brasil")
-                carteira_solidas = criar_carteira_recomendada(resultados_ordenados, "Empresas Sólidas")
-                
-                if carteira_solidas:
-                    df_solidas = pd.DataFrame([
-                        {
-                            'Ticker': r['Ticker'],
-                            'Nome': r['Nome'],
-                            'Setor': r['Setor'],
-                            'Pontuação': round(r['PontuacaoFinal'], 2),
-                            'ROE': formatar_metrica(r['Metricas'].get('ROE'), 'percentual'),
-                            'ROIC': formatar_metrica(r['Metricas'].get('ROIC'), 'percentual'),
-                            'Dív/Pat': formatar_metrica(r['Metricas'].get('DividaPatrimonio'), 'decimal')
-                        }
-                        for r in carteira_solidas
-                    ])
-                    st.dataframe(df_solidas, use_container_width=True)
-                else:
-                    st.info("Nenhuma ação classificada nesta categoria.")
-                
-                # Ações Defensivas
-                st.markdown("### 🛡️ Ações Defensivas do Brasil")
-                carteira_defensivas = criar_carteira_recomendada(resultados_ordenados, "Ações Defensivas")
-                
-                if carteira_defensivas:
-                    df_defensivas = pd.DataFrame([
-                        {
-                            'Ticker': r['Ticker'],
-                            'Nome': r['Nome'],
-                            'Setor': r['Setor'],
-                            'Pontuação': round(r['PontuacaoFinal'], 2),
-                            'Div. Yield': formatar_metrica(r['Metricas'].get('DividendYield'), 'percentual'),
-                            'Payout': formatar_metrica(r['Metricas'].get('Payout'), 'percentual'),
-                            'Liq. Corrente': formatar_metrica(r['Metricas'].get('LiquidezCorrente'), 'decimal')
-                        }
-                        for r in carteira_defensivas
-                    ])
-                    st.dataframe(df_defensivas, use_container_width=True)
-                else:
-                    st.info("Nenhuma ação classificada nesta categoria.")
-                
-                # Ações Baratas
-                st.markdown("### 💰 Ações Baratas do Brasil")
-                carteira_baratas = criar_carteira_recomendada(resultados_ordenados, "Ações Baratas")
-                
-                if carteira_baratas:
-                    df_baratas = pd.DataFrame([
-                        {
-                            'Ticker': r['Ticker'],
-                            'Nome': r['Nome'],
-                            'Setor': r['Setor'],
-                            'Pontuação': round(r['PontuacaoFinal'], 2),
-                            'P/L': formatar_metrica(r['Metricas'].get('PL'), 'decimal'),
-                            'P/VP': formatar_metrica(r['Metricas'].get('PVP'), 'decimal'),
-                            'EV/EBITDA': formatar_metrica(r['Metricas'].get('EV_EBITDA'), 'decimal')
-                        }
-                        for r in carteira_baratas
-                    ])
-                    st.dataframe(df_baratas, use_container_width=True)
-                else:
-                    st.info("Nenhuma ação classificada nesta categoria.")
-                
-                # Carteira Personalizada para o Perfil
-                st.markdown(f"### 🎯 Carteira Personalizada para Perfil {perfil}")
-                
-                # Criar carteira personalizada com base no perfil e cenário
-                carteira_personalizada = []
-                
-                # Determinar número de ações por categoria com base na alocação sugerida
-                num_melhores = max(1, int(float(alocacao.get("Melhores Ações", "0%").replace("%", "")) / 100 * 10))
-                num_solidas = max(1, int(float(alocacao.get("Empresas Sólidas", "0%").replace("%", "")) / 100 * 10))
-                num_defensivas = max(1, int(float(alocacao.get("Ações Defensivas", "0%").replace("%", "")) / 100 * 10))
-                num_baratas = max(1, int(float(alocacao.get("Ações Baratas", "0%").replace("%", "")) / 100 * 10))
-                
-                # Adicionar ações de cada categoria
-                for r in carteira_melhores[:num_melhores]:
-                    if r not in carteira_personalizada:
-                        carteira_personalizada.append(r)
-                
-                for r in carteira_solidas[:num_solidas]:
-                    if r not in carteira_personalizada:
-                        carteira_personalizada.append(r)
-                
-                for r in carteira_defensivas[:num_defensivas]:
-                    if r not in carteira_personalizada:
-                        carteira_personalizada.append(r)
-                
-                for r in carteira_baratas[:num_baratas]:
-                    if r not in carteira_personalizada:
-                        carteira_personalizada.append(r)
-                
-                # Exibir carteira personalizada
-                if carteira_personalizada:
-                    df_personalizada = pd.DataFrame([
-                        {
-                            'Ticker': r['Ticker'],
-                            'Nome': r['Nome'],
-                            'Setor': r['Setor'],
-                            'Categorias': ', '.join(r['Categorias']),
-                            'Pontuação': round(r['PontuacaoFinal'], 2),
-                            'P/L': formatar_metrica(r['Metricas'].get('PL'), 'decimal'),
-                            'Div. Yield': formatar_metrica(r['Metricas'].get('DividendYield'), 'percentual'),
-                            'ROE': formatar_metrica(r['Metricas'].get('ROE'), 'percentual')
-                        }
-                        for r in carteira_personalizada
-                    ])
-                    st.dataframe(df_personalizada, use_container_width=True)
-                    
-                    # Gráfico de distribuição setorial
-                    setores = df_personalizada['Setor'].value_counts()
-                    fig_setores = px.pie(
-                        names=setores.index,
-                        values=setores.values,
-                        title="Distribuição Setorial da Carteira Personalizada"
-                    )
-                    st.plotly_chart(fig_setores, use_container_width=True)
-                else:
-                    st.info("Não foi possível criar uma carteira personalizada com os dados disponíveis.")
-            
-            with tab3:
-                # Análise por setor
-                st.subheader("Análise por Setor")
-                
-                # Agrupar resultados por setor
-                setores = {}
-                for r in resultados:
-                    setor = r['Setor']
-                    if setor not in setores:
-                        setores[setor] = []
-                    setores[setor].append(r)
-                
-                # Pontuação média por setor
-                pontuacoes_setor = {
-                    setor: sum(r['PontuacaoFinal'] for r in acoes) / len(acoes)
-                    for setor, acoes in setores.items() if setor != 'N/A'
-                }
-                
-                # Ordenar setores por pontuação
-                setores_ordenados = sorted(pontuacoes_setor.items(), key=lambda x: x[1], reverse=True)
-                
-                # Gráfico de pontuações por setor
-                fig_setores = px.bar(
-                    x=[s[0] for s in setores_ordenados],
-                    y=[s[1] for s in setores_ordenados],
-                    title="Pontuação Média por Setor",
-                    labels={'x': 'Setor', 'y': 'Pontuação Média (0-10)'},
-                    color=[s[1] for s in setores_ordenados],
-                    color_continuous_scale='RdYlGn'
-                )
-                st.plotly_chart(fig_setores, use_container_width=True)
-                
-                # Melhor ação por setor
-                st.subheader("Melhor Ação por Setor")
-                
-                melhores_por_setor = []
-                for setor, acoes in setores.items():
-                    if setor != 'N/A' and acoes:
-                        # Ordenar ações do setor por pontuação
-                        acoes_ordenadas = sorted(acoes, key=lambda x: x['PontuacaoFinal'], reverse=True)
-                        # Adicionar a melhor ação do setor
-                        melhores_por_setor.append(acoes_ordenadas[0])
-                
-                # Ordenar por pontuação
-                melhores_por_setor = sorted(melhores_por_setor, key=lambda x: x['PontuacaoFinal'], reverse=True)
-                
-                # Criar dataframe
-                df_melhores_setor = pd.DataFrame([
-                    {
-                        'Ticker': r['Ticker'],
-                        'Nome': r['Nome'],
-                        'Setor': r['Setor'],
-                        'Pontuação': round(r['PontuacaoFinal'], 2),
-                        'Categorias': ', '.join(r['Categorias']),
-                        'P/L': formatar_metrica(r['Metricas'].get('PL'), 'decimal'),
-                        'ROE': formatar_metrica(r['Metricas'].get('ROE'), 'percentual')
-                    }
-                    for r in melhores_por_setor
+                # Preparar dados para gráfico
+                df_composicao = pd.DataFrame([
+                    {'Ticker': r['Ticker'], 'Pontuação': r['PontuacaoFinal'], 'Setor': r['Setor']}
+                    for r in carteira
                 ])
                 
-                st.dataframe(df_melhores_setor, use_container_width=True)
-                
-                # Distribuição de categorias por setor
-                st.subheader("Distribuição de Categorias por Setor")
-                
-                # Contar categorias por setor
-                categorias_por_setor = {}
-                for r in resultados:
-                    setor = r['Setor']
-                    if setor != 'N/A':
-                        if setor not in categorias_por_setor:
-                            categorias_por_setor[setor] = {
-                                'Melhores Ações Brasileiras': 0,
-                                'Empresas Sólidas': 0,
-                                'Ações Defensivas': 0,
-                                'Ações Baratas': 0,
-                                'Outras': 0
-                            }
-                        
-                        # Incrementar contadores de categorias
-                        categorias_encontradas = False
-                        for categoria in ['Melhores Ações Brasileiras', 'Empresas Sólidas', 'Ações Defensivas', 'Ações Baratas']:
-                            if categoria in r['Categorias']:
-                                categorias_por_setor[setor][categoria] += 1
-                                categorias_encontradas = True
-                        
-                        if not categorias_encontradas:
-                            categorias_por_setor[setor]['Outras'] += 1
-                
-                # Criar dataframe para heatmap
-                setores_list = []
-                categorias_list = []
-                valores_list = []
-                
-                for setor, categorias in categorias_por_setor.items():
-                    for categoria, valor in categorias.items():
-                        setores_list.append(setor)
-                        categorias_list.append(categoria)
-                        valores_list.append(valor)
-                
-                df_heatmap = pd.DataFrame({
-                    'Setor': setores_list,
-                    'Categoria': categorias_list,
-                    'Valor': valores_list
-                })
-                
-                # Criar heatmap
-                fig_heatmap = px.density_heatmap(
-                    df_heatmap,
-                    x='Setor',
-                    y='Categoria',
-                    z='Valor',
-                    title="Distribuição de Categorias por Setor",
-                    color_continuous_scale='YlGnBu'
+                # Criar gráfico
+                fig = px.pie(
+                    df_composicao,
+                    names='Ticker',
+                    values='Pontuação',
+                    title=f"Composição da Carteira - {categoria_selecionada}",
+                    hover_data=['Setor'],
+                    color_discrete_sequence=px.colors.qualitative.Set3
                 )
                 
-                fig_heatmap.update_layout(
-                    xaxis_title="Setor",
-                    yaxis_title="Categoria",
+                fig.update_traces(textposition='inside', textinfo='percent+label')
+                
+                fig.update_layout(
                     height=500
                 )
                 
-                st.plotly_chart(fig_heatmap, use_container_width=True)
+                st.plotly_chart(fig, use_container_width=True)
+            else:
+                st.warning(f"Não há ações suficientes na categoria {categoria_selecionada} para criar uma carteira recomendada.")
+        
+        with tab4:
+            st.subheader("Alocação Sugerida por Perfil e Cenário")
             
-            with tab4:
-                # Detalhes por ação
-                st.subheader("Detalhes por Ação")
+            # Obter alocação sugerida
+            alocacao = sugerir_alocacao(perfil, cenario)
+            
+            # Exibir informações
+            st.markdown(f"**Perfil do Investidor:** {perfil}")
+            st.markdown(f"**Cenário Macroeconômico:** {cenario}")
+            
+            # Exibir alocação
+            st.markdown("**Alocação Sugerida:**")
+            
+            # Criar colunas para exibir percentuais
+            cols = st.columns(len(alocacao))
+            
+            for i, (categoria, percentual) in enumerate(alocacao.items()):
+                cols[i].metric(categoria, percentual)
+            
+            # Gráfico de alocação
+            fig = gerar_grafico_alocacao(
+                alocacao,
+                f"Alocação Sugerida - Perfil {perfil}, Cenário {cenario}"
+            )
+            
+            st.plotly_chart(fig, use_container_width=True)
+            
+            # Sugestão de carteira balanceada
+            st.subheader("Sugestão de Carteira Balanceada")
+            
+            # Criar carteiras para cada categoria
+            carteiras_por_categoria = {}
+            for categoria in alocacao.keys():
+                if categoria == "Melhores Ações":
+                    categoria_busca = "Melhores Ações Brasileiras"
+                else:
+                    categoria_busca = categoria
                 
-                # Seleção de ação
-                opcoes_acoes = [(f"{r['Ticker']} - {r['Nome']}") for r in resultados_ordenados]
-                acao_selecionada = st.selectbox("Selecione uma ação para ver detalhes", opcoes_acoes)
+                carteira = criar_carteira_recomendada(resultados, categoria_busca, max_acoes=3)
+                carteiras_por_categoria[categoria] = carteira
+            
+            # Exibir carteiras
+            for categoria, carteira in carteiras_por_categoria.items():
+                st.markdown(f"**{categoria} ({alocacao[categoria]})**")
                 
-                if acao_selecionada:
-                    # Extrair ticker da seleção
-                    ticker_selecionado = acao_selecionada.split(" - ")[0]
+                if carteira:
+                    # Criar dataframe para exibição
+                    df_carteira = pd.DataFrame([
+                        {
+                            'Ticker': r['Ticker'],
+                            'Nome': r['Nome'],
+                            'Pontuação': f"{r['PontuacaoFinal']:.2f}"
+                        }
+                        for r in carteira
+                    ])
                     
-                    # Encontrar ação nos resultados
-                    acao = next((r for r in resultados if r['Ticker'] == ticker_selecionado), None)
-                    
-                    if acao:
-                        # Exibir detalhes da ação
-                        col1, col2 = st.columns([2, 1])
-                        
-                        with col1:
-                            st.markdown(f"### {acao['Nome']} ({acao['Ticker']})")
-                            st.markdown(f"**Setor:** {acao['Setor']}")
-                            st.markdown(f"**Categorias:** {', '.join(acao['Categorias'])}")
-                            st.markdown(f"**Pontuação Final:** {acao['PontuacaoFinal']:.2f}/10")
-                            
-                            # Gráfico de radar das pontuações
-                            fig_radar = gerar_grafico_radar(
-                                acao['Pontuacoes'],
-                                f"Pontuações por Critério - {acao['Ticker']}"
-                            )
-                            st.plotly_chart(fig_radar, use_container_width=True)
-                        
-                        with col2:
-                            # Métricas principais
-                            st.markdown("### Métricas Principais")
-                            
-                            metricas = acao['Metricas']
-                            
-                            # Lucratividade
-                            st.markdown("#### Lucratividade")
-                            col_a, col_b = st.columns(2)
-                            col_a.metric("ROE", formatar_metrica(metricas.get('ROE'), 'percentual'))
-                            col_b.metric("ROIC", formatar_metrica(metricas.get('ROIC'), 'percentual'))
-                            col_a.metric("Margem Líquida", formatar_metrica(metricas.get('MargemLiquida'), 'percentual'))
-                            col_b.metric("Cresc. Lucros", formatar_metrica(metricas.get('CrescimentoLucros'), 'percentual'))
-                            
-                            # Avaliação
-                            st.markdown("#### Avaliação")
-                            col_a, col_b = st.columns(2)
-                            col_a.metric("P/L", formatar_metrica(metricas.get('PL'), 'decimal'))
-                            col_b.metric("P/VP", formatar_metrica(metricas.get('PVP'), 'decimal'))
-                            col_a.metric("EV/EBITDA", formatar_metrica(metricas.get('EV_EBITDA'), 'decimal'))
-                            col_b.metric("Div. Yield", formatar_metrica(metricas.get('DividendYield'), 'percentual'))
-                            
-                            # Saúde Financeira
-                            st.markdown("#### Saúde Financeira")
-                            col_a, col_b = st.columns(2)
-                            col_a.metric("Dívida/Patrimônio", formatar_metrica(metricas.get('DividaPatrimonio'), 'decimal'))
-                            col_b.metric("Liquidez Corrente", formatar_metrica(metricas.get('LiquidezCorrente'), 'decimal'))
-                            col_a.metric("Payout", formatar_metrica(metricas.get('Payout'), 'percentual'))
-                        
-                        # Gráfico de barras das pontuações
-                        st.markdown("### Pontuações Detalhadas")
-                        fig_barras = gerar_grafico_pontuacao(
-                            acao['Pontuacoes'],
-                            f"Pontuações por Critério - {acao['Ticker']}"
-                        )
-                        st.plotly_chart(fig_barras, use_container_width=True)
-                        
-                        # Histórico de preços
-                        st.markdown("### Histórico de Preços")
-                        
-                        try:
-                            # Obter dados históricos
-                            dados_historicos = yf.Ticker(acao['Ticker']).history(period="1y")
-                            
-                            if not dados_historicos.empty:
-                                # Criar gráfico de preços
-                                fig_precos = px.line(
-                                    dados_historicos,
-                                    y='Close',
-                                    title=f"Preço de Fechamento - {acao['Ticker']} (Último Ano)",
-                                    labels={'Close': 'Preço de Fechamento (R$)', 'index': 'Data'}
-                                )
-                                
-                                st.plotly_chart(fig_precos, use_container_width=True)
-                            else:
-                                st.info("Dados históricos não disponíveis para esta ação.")
-                        except Exception as e:
-                            st.error(f"Erro ao obter dados históricos: {e}")
-        else:
-            st.warning("Nenhum resultado encontrado. Tente ajustar os parâmetros ou selecionar outras ações.")
+                    # Exibir tabela
+                    st.dataframe(df_carteira, use_container_width=True)
+                else:
+                    st.warning(f"Não há ações suficientes na categoria {categoria} para sugerir.")
     
-    # Explicação da metodologia
-    with st.expander("Metodologia de Análise"):
-        st.markdown("""
-        ### Como Funciona o Pro Picks IA
-
-        O Pro Picks IA utiliza uma combinação de inteligência artificial e análise fundamentalista para identificar as melhores oportunidades de investimento no mercado brasileiro. O sistema analisa mais de 250 métricas financeiras de centenas de empresas brasileiras para criar carteiras otimizadas.
-
-        #### Categorias de Critérios e Pesos
-
-        1. **Demonstrações Financeiras e Lucratividade (25%)**
-           - ROE (Retorno sobre Patrimônio): Avalia a eficiência da empresa em gerar lucros
-           - ROIC (Retorno sobre Capital Investido): Mede o retorno gerado por todo o capital investido
-           - Margem Líquida: Indica a eficiência operacional e capacidade de conversão de receitas em lucros
-           - Crescimento de Lucros: Avalia a tendência de crescimento dos lucros ao longo do tempo
-
-        2. **Avaliação e Múltiplos (20%)**
-           - P/L (Preço/Lucro): Relaciona o preço da ação com o lucro por ação
-           - P/VP (Preço/Valor Patrimonial): Relaciona o preço da ação com seu valor patrimonial
-           - EV/EBITDA: Avalia o valor da empresa em relação ao seu EBITDA
-           - Dividend Yield: Mede o retorno em dividendos em relação ao preço da ação
-
-        3. **Saúde Financeira e Liquidez (20%)**
-           - Dívida/Patrimônio: Avalia o nível de alavancagem financeira da empresa
-           - Liquidez Corrente: Mede a capacidade da empresa de pagar suas obrigações de curto prazo
-           - Payout: Percentual do lucro distribuído como dividendos
-
-        4. **Momento e Tendências de Preço (15%)**
-           - Performance Relativa: Compara o desempenho da ação com o Ibovespa
-           - Volatilidade: Avalia a estabilidade do preço da ação
-           - Volume de Negociação: Mede a liquidez da ação no mercado
-
-        5. **Qualidade e Eficiência (10%)**
-           - Giro de Ativos: Mede a eficiência com que a empresa utiliza seus ativos
-           - Consistência de Resultados: Avalia a previsibilidade e estabilidade dos resultados financeiros
-           - Qualidade dos Lucros: Compara o lucro contábil com o fluxo de caixa operacional
-
-        6. **Fatores Setoriais e Macroeconômicos (10%)**
-           - Sensibilidade ao Ciclo Econômico: Avalia como o setor responde a mudanças no cenário macroeconômico
-           - Posição Competitiva no Setor: Avalia a posição da empresa em relação aos concorrentes
-           - Exposição a Tendências de Longo Prazo: Avalia o alinhamento do negócio com tendências estruturais
-
-        #### Carteiras Temáticas
-
-        O sistema cria quatro tipos principais de carteiras:
-
-        1. **Melhores Ações Brasileiras**: Ações com melhor pontuação geral, que podem liderar o mercado
-        2. **Empresas Sólidas**: Empresas altamente lucrativas, com histórico de resultados consistentes e forte solidez financeira
-        3. **Ações Defensivas**: Empresas estáveis e pagadoras de dividendos, em setores mais resilientes a ciclos econômicos
-        4. **Ações Baratas**: Ações descontadas com fundamentos sólidos, buscando capturar oportunidades de valor
-
-        #### Ajuste ao Cenário Macroeconômico
-
-        O sistema ajusta as recomendações com base no cenário macroeconômico atual:
-
-        - **Expansão**: Favorece empresas cíclicas e de crescimento
-        - **Desaceleração**: Favorece empresas de qualidade e setores defensivos
-        - **Recessão**: Favorece empresas com balanços sólidos e baixo endividamento
-        - **Recuperação**: Favorece empresas cíclicas de qualidade e setores mais sensíveis
-        """)
-    
-    # Rodapé
-    st.markdown("---")
-    st.markdown("""
-    **Pro Picks IA - Simulação** | Desenvolvido com base na metodologia do Pro Picks IA do Investing.com
-    
-    *Aviso: Esta aplicação é apenas uma simulação e não constitui recomendação de investimento. Consulte um profissional financeiro antes de tomar decisões de investimento.*
-    """)
+    # Exibir informações adicionais
+    st.sidebar.markdown("---")
+    st.sidebar.markdown("**Pro Picks IA - Versão 1.0**")
+    st.sidebar.markdown("Desenvolvido como simulação do sistema Pro Picks IA")
 
 if __name__ == "__main__":
     main()
