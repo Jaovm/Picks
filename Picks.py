@@ -60,51 +60,40 @@ def coletar_dados_acao(ticker):
     try:
         with st.spinner(f"Coletando dados para {ticker}..."):
             acao = yf.Ticker(ticker)
-            
-            # Dicionário para armazenar todos os dados
             dados = {}
-            
+
             # 1. Informações básicas
             info = acao.info
             dados['info'] = info
-            
+
             # 2. Demonstrações financeiras
             try:
-                if hasattr(acao, "income_stmt"):
-                    income_stmt = acao.income_stmt
-                    if isinstance(income_stmt, pd.DataFrame):
-                        dados['income_statement'] = income_stmt.reset_index().to_dict('records')
-                    else:
-                        dados['income_statement'] = {}
+                income_stmt = acao.income_stmt
+                if isinstance(income_stmt, pd.DataFrame):
+                    dados['income_statement'] = income_stmt.reset_index().to_dict('records')
                 else:
-                    dados['income_statement'] = {}
-            except:
-                dados['income_statement'] = {}
-                
+                    dados['income_statement'] = []
+            except Exception as e:
+                dados['income_statement'] = []
+
             try:
-                if hasattr(acao, "balance_sheet"):
-                    balance_sheet = acao.balance_sheet
-                    if isinstance(balance_sheet, pd.DataFrame):
-                        dados['balance_sheet'] = balance_sheet.reset_index().to_dict('records')
-                    else:
-                        dados['balance_sheet'] = {}
+                balance_sheet = acao.balance_sheet
+                if isinstance(balance_sheet, pd.DataFrame):
+                    dados['balance_sheet'] = balance_sheet.reset_index().to_dict('records')
                 else:
-                    dados['balance_sheet'] = {}
-            except:
-                dados['balance_sheet'] = {}
-                
+                    dados['balance_sheet'] = []
+            except Exception as e:
+                dados['balance_sheet'] = []
+
             try:
-                if hasattr(acao, "cashflow"):
-                    cash_flow = acao.cashflow
-                    if isinstance(cash_flow, pd.DataFrame):
-                        dados['cash_flow'] = cash_flow.reset_index().to_dict('records')
-                    else:
-                        dados['cash_flow'] = {}
+                cash_flow = acao.cashflow
+                if isinstance(cash_flow, pd.DataFrame):
+                    dados['cash_flow'] = cash_flow.reset_index().to_dict('records')
                 else:
-                    dados['cash_flow'] = {}
-            except:
-                dados['cash_flow'] = {}
-            
+                    dados['cash_flow'] = []
+            except Exception as e:
+                dados['cash_flow'] = []
+
             # 3. Dados históricos (2 anos)
             end_date = datetime.now()
             start_date = end_date - timedelta(days=2*365)
@@ -114,9 +103,9 @@ def coletar_dados_acao(ticker):
                     dados['historical'] = hist.reset_index().to_dict('records')
                 else:
                     dados['historical'] = []
-            except:
+            except Exception as e:
                 dados['historical'] = []
-            
+
             # 4. Dividendos
             try:
                 dividends = acao.dividends
@@ -124,14 +113,14 @@ def coletar_dados_acao(ticker):
                     dados['dividends'] = dividends.reset_index().to_dict('records')
                 else:
                     dados['dividends'] = []
-            except:
+            except Exception as e:
                 dados['dividends'] = []
-            
+
             # Salvar dados em arquivo JSON
             arquivo = os.path.join(DATA_DIR, f"{ticker.replace('.', '_')}.json")
             with open(arquivo, 'w', encoding='utf-8') as f:
                 json.dump(dados, f, ensure_ascii=False, indent=2)
-            
+
             return dados
     except Exception as e:
         st.error(f"Erro ao coletar dados para {ticker}: {e}")
