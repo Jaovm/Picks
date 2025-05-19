@@ -131,7 +131,7 @@ def coletar_dados_acao(ticker):
             
             # 3. Dados históricos (2 anos)
             end_date = datetime.now()
-            start_date = end_date - timedelta(days=2*365)
+            start_date = end_date - timedelta(days=5*365)
             try:
                 hist = acao.history(start=start_date, end=end_date, interval="1d")
                 if hist is not None and not hist.empty:
