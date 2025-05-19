@@ -71,7 +71,11 @@ def coletar_dados_acao(ticker):
             # 2. Demonstrações financeiras
             try:
                 if hasattr(acao, "income_stmt"):
-                    dados['income_statement'] = acao.income_stmt.to_dict()
+                    income_stmt = acao.income_stmt
+                    if isinstance(income_stmt, pd.DataFrame):
+                        dados['income_statement'] = income_stmt.reset_index().to_dict('records')
+                    else:
+                        dados['income_statement'] = {}
                 else:
                     dados['income_statement'] = {}
             except:
@@ -79,7 +83,11 @@ def coletar_dados_acao(ticker):
                 
             try:
                 if hasattr(acao, "balance_sheet"):
-                    dados['balance_sheet'] = acao.balance_sheet.to_dict()
+                    balance_sheet = acao.balance_sheet
+                    if isinstance(balance_sheet, pd.DataFrame):
+                        dados['balance_sheet'] = balance_sheet.reset_index().to_dict('records')
+                    else:
+                        dados['balance_sheet'] = {}
                 else:
                     dados['balance_sheet'] = {}
             except:
@@ -87,7 +95,11 @@ def coletar_dados_acao(ticker):
                 
             try:
                 if hasattr(acao, "cashflow"):
-                    dados['cash_flow'] = acao.cashflow.to_dict()
+                    cash_flow = acao.cashflow
+                    if isinstance(cash_flow, pd.DataFrame):
+                        dados['cash_flow'] = cash_flow.reset_index().to_dict('records')
+                    else:
+                        dados['cash_flow'] = {}
                 else:
                     dados['cash_flow'] = {}
             except:
@@ -98,20 +110,25 @@ def coletar_dados_acao(ticker):
             start_date = end_date - timedelta(days=2*365)
             try:
                 hist = acao.history(start=start_date, end=end_date, interval="1d")
-                dados['historical'] = hist.reset_index().to_dict('records')
+                if isinstance(hist, pd.DataFrame):
+                    dados['historical'] = hist.reset_index().to_dict('records')
+                else:
+                    dados['historical'] = []
             except:
                 dados['historical'] = []
             
             # 4. Dividendos
             try:
                 dividends = acao.dividends
-                dados['dividends'] = dividends.reset_index().to_dict('records') if hasattr(dividends, "reset_index") else {}
+                if isinstance(dividends, pd.Series):
+                    dados['dividends'] = dividends.reset_index().to_dict('records')
+                else:
+                    dados['dividends'] = []
             except:
-                dados['dividends'] = {}
+                dados['dividends'] = []
             
             # Salvar dados em arquivo JSON
             arquivo = os.path.join(DATA_DIR, f"{ticker.replace('.', '_')}.json")
-            # Para garantir que o JSON seja válido, use ensure_ascii=False e indent=2
             with open(arquivo, 'w', encoding='utf-8') as f:
                 json.dump(dados, f, ensure_ascii=False, indent=2)
             
