@@ -1,6 +1,7 @@
 """
 Pro Picks IA - Simulação de Seleção de Melhores Ações Brasileiras
 Aplicativo Streamlit que simula o funcionamento do Pro Picks IA
+Versão com análise de carteira e recomendação de aportes
 """
 
 import streamlit as st
@@ -21,6 +22,7 @@ import re
 from PIL import Image
 import io
 import base64
+import random
 
 # Configuração da página
 st.set_page_config(
@@ -131,7 +133,7 @@ def coletar_dados_acao(ticker):
             
             # 3. Dados históricos (2 anos)
             end_date = datetime.now()
-            start_date = end_date - timedelta(days=5*365)
+            start_date = end_date - timedelta(days=2*365)
             try:
                 hist = acao.history(start=start_date, end=end_date, interval="1d")
                 if hist is not None and not hist.empty:
@@ -985,6 +987,269 @@ def validar_ticker(ticker):
     # Se não estiver em nenhum formato reconhecido, retorna None
     return None
 
+# Função para analisar a carteira atual e recomendar aportes
+def analisar_carteira_e_recomendar_aportes(carteira_atual, resultados, perfil, cenario, valor_aporte=1000):
+    """
+    Analisa a carteira atual e recomenda aportes com base na análise fundamentalista
+    
+    Args:
+        carteira_atual (dict): Dicionário com ticker como chave e percentual como valor
+        resultados (list): Lista de resultados da análise de ações
+        perfil (str): Perfil do investidor
+        cenario (str): Cenário macroeconômico
+        valor_aporte (float): Valor do aporte a ser realizado
+        
+    Returns:
+        dict: Recomendações de aporte
+    """
+    # Obter alocação ideal
+    alocacao_ideal = sugerir_alocacao(perfil, cenario)
+    
+    # Converter percentuais para valores numéricos
+    alocacao_ideal_num = {k: float(v.replace('%', '')) for k, v in alocacao_ideal.items()}
+    
+    # Mapear ações para categorias
+    acoes_por_categoria = {}
+    for categoria in alocacao_ideal.keys():
+        if categoria == "Melhores Ações":
+            categoria_busca = "Melhores Ações Brasileiras"
+        else:
+            categoria_busca = categoria
+        
+        acoes_categoria = [r for r in resultados if categoria_busca in r['Categorias']]
+        acoes_por_categoria[categoria] = sorted(acoes_categoria, key=lambda x: x['PontuacaoFinal'], reverse=True)
+    
+    # Analisar diferenças entre carteira atual e ideal
+    categorias_atuais = {}
+    for ticker, percentual in carteira_atual.items():
+        # Encontrar a ação nos resultados
+        acao = next((r for r in resultados if r['Ticker'] == ticker), None)
+        if acao:
+            # Identificar categorias da ação
+            for categoria in acao['Categorias']:
+                categoria_map = categoria
+                if categoria == "Melhores Ações Brasileiras":
+                    categoria_map = "Melhores Ações"
+                
+                if categoria_map in categorias_atuais:
+                    categorias_atuais[categoria_map] += percentual
+                else:
+                    categorias_atuais[categoria_map] = percentual
+    
+    # Preencher categorias ausentes com 0
+    for categoria in alocacao_ideal.keys():
+        if categoria not in categorias_atuais:
+            categorias_atuais[categoria] = 0
+    
+    # Calcular diferenças
+    diferencas = {}
+    for categoria, percentual_ideal in alocacao_ideal_num.items():
+        percentual_atual = categorias_atuais.get(categoria, 0)
+        diferencas[categoria] = percentual_ideal - percentual_atual
+    
+    # Calcular recomendações de aporte
+    recomendacoes = {}
+    
+    # Normalizar diferenças positivas para distribuir o aporte
+    diferencas_positivas = {k: v for k, v in diferencas.items() if v > 0}
+    soma_diferencas_positivas = sum(diferencas_positivas.values())
+    
+    if soma_diferencas_positivas > 0:
+        # Distribuir o aporte proporcionalmente às diferenças positivas
+        for categoria, diferenca in diferencas_positivas.items():
+            percentual_aporte = diferenca / soma_diferencas_positivas
+            valor_categoria = valor_aporte * percentual_aporte
+            
+            # Selecionar as melhores ações da categoria para aporte
+            acoes_recomendadas = []
+            if categoria in acoes_por_categoria and len(acoes_por_categoria[categoria]) > 0:
+                # Pegar as 3 melhores ações da categoria
+                melhores_acoes = acoes_por_categoria[categoria][:3]
+                
+                # Verificar quais dessas ações já estão na carteira e quais são novas
+                acoes_existentes = [a for a in melhores_acoes if a['Ticker'] in carteira_atual]
+                acoes_novas = [a for a in melhores_acoes if a['Ticker'] not in carteira_atual]
+                
+                # Priorizar ações existentes com baixa representação e depois novas ações
+                for acao in acoes_existentes:
+                    if carteira_atual.get(acao['Ticker'], 0) < 5:  # Se a ação tem menos de 5% na carteira
+                        acoes_recomendadas.append(acao)
+                
+                # Adicionar novas ações promissoras
+                for acao in acoes_novas:
+                    acoes_recomendadas.append(acao)
+                
+                # Limitar a 3 recomendações por categoria
+                acoes_recomendadas = acoes_recomendadas[:3]
+                
+                # Distribuir o valor da categoria entre as ações recomendadas
+                if acoes_recomendadas:
+                    valor_por_acao = valor_categoria / len(acoes_recomendadas)
+                    for acao in acoes_recomendadas:
+                        recomendacoes[acao['Ticker']] = {
+                            'Nome': acao['Nome'],
+                            'Valor': valor_por_acao,
+                            'Percentual': percentual_aporte * 100 / len(acoes_recomendadas),
+                            'Categoria': categoria,
+                            'Pontuacao': acao['PontuacaoFinal'],
+                            'Motivo': gerar_motivo_recomendacao(acao, categoria, carteira_atual.get(acao['Ticker'], 0))
+                        }
+    
+    return {
+        'carteira_atual': categorias_atuais,
+        'alocacao_ideal': alocacao_ideal_num,
+        'diferencas': diferencas,
+        'recomendacoes': recomendacoes
+    }
+
+def gerar_motivo_recomendacao(acao, categoria, percentual_atual):
+    """Gera um motivo personalizado para a recomendação de aporte"""
+    motivos = []
+    
+    # Motivos baseados na categoria
+    if categoria == "Ações Defensivas":
+        motivos.append(f"Excelente dividend yield de {formatar_metrica(acao['Metricas'].get('DividendYield', 0), 'percentual')}")
+        motivos.append("Baixa volatilidade e boa proteção em cenários de incerteza")
+        motivos.append(f"Payout sustentável de {formatar_metrica(acao['Metricas'].get('Payout', 0), 'percentual')}")
+    
+    elif categoria == "Empresas Sólidas":
+        motivos.append(f"ROE expressivo de {formatar_metrica(acao['Metricas'].get('ROE', 0), 'percentual')}")
+        motivos.append(f"Baixo endividamento com Dívida/Patrimônio de {formatar_metrica(acao['Metricas'].get('DividaPatrimonio', 0), 'decimal')}")
+        motivos.append("Histórico consistente de resultados")
+    
+    elif categoria == "Ações Baratas":
+        motivos.append(f"Múltiplo P/L atrativo de {formatar_metrica(acao['Metricas'].get('PL', 0), 'decimal')}")
+        motivos.append(f"P/VP abaixo da média do setor em {formatar_metrica(acao['Metricas'].get('PVP', 0), 'decimal')}")
+        motivos.append("Potencial de valorização significativo")
+    
+    elif categoria == "Melhores Ações":
+        motivos.append(f"Pontuação excepcional de {formatar_metrica(acao['PontuacaoFinal'], 'decimal')}/10")
+        motivos.append(f"Crescimento de lucros de {formatar_metrica(acao['Metricas'].get('CrescimentoLucros', 0), 'percentual')}")
+        motivos.append("Excelente combinação de valor e crescimento")
+    
+    # Motivos baseados na situação atual na carteira
+    if percentual_atual == 0:
+        motivos.append("Oportunidade de diversificação com nova posição na carteira")
+    elif percentual_atual < 3:
+        motivos.append(f"Aumentar exposição atual de apenas {percentual_atual:.1f}% para melhor balanceamento")
+    
+    # Motivos baseados em métricas específicas
+    if acao['Metricas'].get('MargemLiquida', 0) > 15:
+        motivos.append(f"Alta margem líquida de {formatar_metrica(acao['Metricas'].get('MargemLiquida', 0), 'percentual')}")
+    
+    if acao['Metricas'].get('LiquidezCorrente', 0) > 1.5:
+        motivos.append("Excelente liquidez financeira")
+    
+    # Selecionar 3 motivos aleatórios da lista
+    if len(motivos) > 3:
+        return random.sample(motivos, 3)
+    else:
+        return motivos
+
+def gerar_relatorio_analista(analise_carteira, perfil, cenario, valor_aporte):
+    """Gera um relatório no estilo de um analista profissional"""
+    # Obter data atual
+    data_atual = datetime.now().strftime("%d/%m/%Y")
+    
+    # Introdução
+    relatorio = f"""
+    # Relatório de Recomendação de Aporte - Pro Picks IA
+    
+    **Data:** {data_atual}
+    **Perfil do Investidor:** {perfil}
+    **Cenário Macroeconômico:** {cenario}
+    **Valor do Aporte:** R$ {valor_aporte:.2f}
+    
+    ## Análise da Carteira Atual
+    
+    Após análise detalhada da sua carteira atual, identificamos algumas oportunidades de otimização 
+    considerando o cenário macroeconômico atual e seu perfil de investidor. A distribuição atual 
+    da sua carteira apresenta algumas divergências em relação à alocação ideal recomendada para 
+    o momento de mercado.
+    
+    ### Distribuição Atual vs. Ideal
+    """
+    
+    # Adicionar tabela de comparação
+    relatorio += "\n    | Categoria | Atual | Ideal | Diferença |\n"
+    relatorio += "    |-----------|-------|-------|----------|\n"
+    
+    for categoria, percentual_ideal in analise_carteira['alocacao_ideal'].items():
+        percentual_atual = analise_carteira['carteira_atual'].get(categoria, 0)
+        diferenca = analise_carteira['diferencas'].get(categoria, 0)
+        
+        # Formatar diferença com sinal
+        if diferenca > 0:
+            diferenca_str = f"+{diferenca:.1f}%"
+        else:
+            diferenca_str = f"{diferenca:.1f}%"
+        
+        relatorio += f"    | {categoria} | {percentual_atual:.1f}% | {percentual_ideal:.1f}% | {diferenca_str} |\n"
+    
+    # Recomendações de aporte
+    relatorio += """
+    
+    ## Recomendações de Aporte
+    
+    Com base na análise fundamentalista e no cenário atual, recomendamos a seguinte distribuição 
+    para o seu aporte:
+    """
+    
+    # Adicionar tabela de recomendações
+    if analise_carteira['recomendacoes']:
+        relatorio += "\n    | Ação | Nome | Valor | % do Aporte |\n"
+        relatorio += "    |------|------|-------|------------|\n"
+        
+        for ticker, info in analise_carteira['recomendacoes'].items():
+            relatorio += f"    | {ticker} | {info['Nome']} | R$ {info['Valor']:.2f} | {info['Percentual']:.1f}% |\n"
+        
+        # Detalhamento das recomendações
+        relatorio += """
+        
+        ## Justificativa das Recomendações
+        
+        A seguir, apresentamos a justificativa detalhada para cada recomendação de aporte:
+        """
+        
+        for ticker, info in analise_carteira['recomendacoes'].items():
+            relatorio += f"""
+        
+        ### {ticker} - {info['Nome']}
+        
+        **Categoria:** {info['Categoria']}
+        **Pontuação:** {info['Pontuacao']:.1f}/10
+        **Valor Recomendado:** R$ {info['Valor']:.2f} ({info['Percentual']:.1f}% do aporte)
+        
+        **Motivos:**
+        """
+            
+            for motivo in info['Motivo']:
+                relatorio += f"        - {motivo}\n"
+    else:
+        relatorio += """
+        
+        Não foram identificadas oportunidades claras de aporte no momento. Recomendamos aguardar
+        melhores oportunidades de entrada ou reavaliar os parâmetros de análise.
+        """
+    
+    # Conclusão
+    relatorio += """
+    
+    ## Conclusão
+    
+    As recomendações acima visam otimizar sua carteira de acordo com o cenário macroeconômico atual
+    e seu perfil de investidor. Lembre-se que estas são recomendações baseadas em análise fundamentalista
+    e devem ser consideradas como parte de uma estratégia de investimento de longo prazo.
+    
+    É importante ressaltar que investimentos em ações envolvem riscos e que resultados passados não
+    garantem retornos futuros. Recomendamos sempre consultar um assessor de investimentos antes de
+    tomar decisões financeiras.
+    
+    **Pro Picks IA - Análise Fundamentalista Inteligente**
+    """
+    
+    return relatorio
+
 # Interface do Streamlit
 def main():
     # Título e descrição
@@ -1074,22 +1339,82 @@ def main():
     
     # Campo para inserir tickers da carteira (no modo personalizado)
     tickers_personalizados = []
+    carteira_atual = {}
+    
     if modo_analise == "Carteira Personalizada":
+        st.sidebar.subheader("Sua Carteira Atual")
+        
+        # Opção para inserir tickers e percentuais
+        st.sidebar.markdown("""
+        Insira os tickers da sua carteira e os percentuais atuais (um por linha).
+        Exemplo:
+        ```
+        PETR4 15
+        VALE3 20
+        ITUB4 10
+        ```
+        """)
+        
         tickers_input = st.sidebar.text_area(
-            "Insira os tickers da sua carteira (um por linha)",
-            help="Exemplo: PETR4, VALE3, ITUB4, etc. Pode inserir com ou sem o sufixo .SA"
+            "Tickers e percentuais da carteira",
+            help="Formato: TICKER PERCENTUAL (um por linha)"
         )
         
         if tickers_input:
-            # Processar os tickers inseridos
+            # Processar os tickers e percentuais inseridos
             linhas = tickers_input.strip().split('\n')
             for linha in linhas:
-                # Remover espaços e vírgulas
-                ticker_limpo = linha.strip().replace(',', '')
-                if ticker_limpo:
+                # Dividir a linha em ticker e percentual
+                partes = linha.strip().split()
+                if len(partes) >= 2:
+                    ticker_limpo = partes[0].strip().replace(',', '')
+                    try:
+                        percentual = float(partes[1].strip().replace(',', '.'))
+                        ticker_validado = validar_ticker(ticker_limpo)
+                        if ticker_validado:
+                            tickers_personalizados.append(ticker_validado)
+                            carteira_atual[ticker_validado] = percentual
+                    except ValueError:
+                        st.sidebar.warning(f"Percentual inválido para {ticker_limpo}. Use formato numérico.")
+                elif len(partes) == 1:
+                    ticker_limpo = partes[0].strip().replace(',', '')
                     ticker_validado = validar_ticker(ticker_limpo)
                     if ticker_validado:
                         tickers_personalizados.append(ticker_validado)
+                        # Atribuir percentual igual para todas as ações sem percentual especificado
+                        carteira_atual[ticker_validado] = 0
+        
+        # Se houver ações sem percentual, distribuir igualmente
+        if carteira_atual and any(p == 0 for p in carteira_atual.values()):
+            acoes_sem_percentual = [t for t, p in carteira_atual.items() if p == 0]
+            percentual_restante = 100 - sum(p for p in carteira_atual.values() if p > 0)
+            if percentual_restante > 0 and acoes_sem_percentual:
+                percentual_por_acao = percentual_restante / len(acoes_sem_percentual)
+                for ticker in acoes_sem_percentual:
+                    carteira_atual[ticker] = percentual_por_acao
+        
+        # Normalizar percentuais para somar 100%
+        soma_percentuais = sum(carteira_atual.values())
+        if soma_percentuais > 0:
+            for ticker in carteira_atual:
+                carteira_atual[ticker] = (carteira_atual[ticker] / soma_percentuais) * 100
+        
+        # Mostrar resumo da carteira
+        if carteira_atual:
+            st.sidebar.subheader("Resumo da Carteira")
+            for ticker, percentual in carteira_atual.items():
+                st.sidebar.text(f"{ticker}: {percentual:.1f}%")
+        
+        # Campo para valor do aporte
+        st.sidebar.subheader("Valor do Aporte")
+        valor_aporte = st.sidebar.number_input(
+            "Valor a ser aportado (R$)",
+            min_value=100.0,
+            max_value=1000000.0,
+            value=1000.0,
+            step=100.0,
+            help="Informe o valor que deseja aportar para receber recomendações personalizadas"
+        )
     
     # Botão para iniciar análise
     if st.sidebar.button("Analisar Ações"):
@@ -1152,7 +1477,21 @@ def main():
         st.header("Resultados da Análise")
         
         # Criar abas para diferentes visualizações
-        tab1, tab2, tab3, tab4 = st.tabs(["Ranking Geral", "Análise Detalhada", "Carteiras Recomendadas", "Alocação Sugerida"])
+        if modo_analise == "Carteira Personalizada" and carteira_atual:
+            tab1, tab2, tab3, tab4, tab5 = st.tabs([
+                "Ranking Geral", 
+                "Análise Detalhada", 
+                "Carteiras Recomendadas", 
+                "Alocação Sugerida",
+                "Recomendação de Aporte"
+            ])
+        else:
+            tab1, tab2, tab3, tab4 = st.tabs([
+                "Ranking Geral", 
+                "Análise Detalhada", 
+                "Carteiras Recomendadas", 
+                "Alocação Sugerida"
+            ])
         
         with tab1:
             st.subheader("Ranking das Ações Analisadas")
@@ -1307,7 +1646,7 @@ def main():
             )
             
             # Criar carteira recomendada
-            carteira = criar_carteira_recomendada(resultados, categoria_selecionada, max_acoes=10)
+            carteira = criar_carteira_recomendada(resultados, categoria_selecionada, max_acoes=5)
             
             if carteira:
                 # Exibir carteira
@@ -1398,7 +1737,7 @@ def main():
                 else:
                     categoria_busca = categoria
                 
-                carteira = criar_carteira_recomendada(resultados, categoria_busca, max_acoes=5)
+                carteira = criar_carteira_recomendada(resultados, categoria_busca, max_acoes=3)
                 carteiras_por_categoria[categoria] = carteira
             
             # Exibir carteiras
@@ -1420,10 +1759,115 @@ def main():
                     st.dataframe(df_carteira, use_container_width=True)
                 else:
                     st.warning(f"Não há ações suficientes na categoria {categoria} para sugerir.")
+        
+        # Aba de Recomendação de Aporte (apenas no modo Carteira Personalizada)
+        if modo_analise == "Carteira Personalizada" and carteira_atual and 'tab5' in locals():
+            with tab5:
+                st.subheader("Recomendação de Aporte Personalizada")
+                
+                # Analisar carteira e gerar recomendações
+                analise_carteira = analisar_carteira_e_recomendar_aportes(
+                    carteira_atual, 
+                    resultados, 
+                    perfil, 
+                    cenario, 
+                    valor_aporte
+                )
+                
+                # Exibir comparação entre carteira atual e ideal
+                col1, col2 = st.columns(2)
+                
+                with col1:
+                    # Gráfico da carteira atual
+                    fig_atual = px.pie(
+                        names=list(analise_carteira['carteira_atual'].keys()),
+                        values=list(analise_carteira['carteira_atual'].values()),
+                        title="Composição Atual da Carteira",
+                        color_discrete_sequence=px.colors.qualitative.Pastel
+                    )
+                    fig_atual.update_traces(textposition='inside', textinfo='percent+label')
+                    st.plotly_chart(fig_atual, use_container_width=True)
+                
+                with col2:
+                    # Gráfico da alocação ideal
+                    fig_ideal = px.pie(
+                        names=list(analise_carteira['alocacao_ideal'].keys()),
+                        values=list(analise_carteira['alocacao_ideal'].values()),
+                        title="Alocação Ideal Recomendada",
+                        color_discrete_sequence=px.colors.qualitative.Pastel
+                    )
+                    fig_ideal.update_traces(textposition='inside', textinfo='percent+label')
+                    st.plotly_chart(fig_ideal, use_container_width=True)
+                
+                # Exibir recomendações de aporte
+                st.subheader("Recomendações para o Aporte de R$ " + f"{valor_aporte:.2f}")
+                
+                if analise_carteira['recomendacoes']:
+                    # Criar dataframe para exibição
+                    df_recomendacoes = pd.DataFrame([
+                        {
+                            'Ticker': ticker,
+                            'Nome': info['Nome'],
+                            'Categoria': info['Categoria'],
+                            'Valor Recomendado': f"R$ {info['Valor']:.2f}",
+                            '% do Aporte': f"{info['Percentual']:.1f}%",
+                            'Pontuação': f"{info['Pontuacao']:.1f}/10"
+                        }
+                        for ticker, info in analise_carteira['recomendacoes'].items()
+                    ])
+                    
+                    # Exibir tabela
+                    st.dataframe(df_recomendacoes, use_container_width=True)
+                    
+                    # Gráfico de distribuição do aporte
+                    fig_aporte = px.pie(
+                        names=[f"{ticker}" for ticker in analise_carteira['recomendacoes'].keys()],
+                        values=[info['Valor'] for info in analise_carteira['recomendacoes'].values()],
+                        title="Distribuição do Aporte",
+                        color_discrete_sequence=px.colors.sequential.Viridis
+                    )
+                    fig_aporte.update_traces(textposition='inside', textinfo='percent+label')
+                    st.plotly_chart(fig_aporte, use_container_width=True)
+                    
+                    # Detalhamento das recomendações
+                    st.subheader("Justificativa das Recomendações")
+                    
+                    for ticker, info in analise_carteira['recomendacoes'].items():
+                        with st.expander(f"{ticker} - {info['Nome']}"):
+                            st.markdown(f"**Categoria:** {info['Categoria']}")
+                            st.markdown(f"**Pontuação:** {info['Pontuacao']:.1f}/10")
+                            st.markdown(f"**Valor Recomendado:** R$ {info['Valor']:.2f} ({info['Percentual']:.1f}% do aporte)")
+                            
+                            st.markdown("**Motivos:**")
+                            for motivo in info['Motivo']:
+                                st.markdown(f"- {motivo}")
+                else:
+                    st.warning("Não foram identificadas oportunidades claras de aporte no momento.")
+                
+                # Relatório completo do analista
+                st.subheader("Relatório do Analista")
+                
+                relatorio = gerar_relatorio_analista(
+                    analise_carteira,
+                    perfil,
+                    cenario,
+                    valor_aporte
+                )
+                
+                st.markdown(relatorio)
+                
+                # Botão para download do relatório
+                relatorio_bytes = relatorio.encode()
+                st.download_button(
+                    label="Baixar Relatório em Markdown",
+                    data=relatorio_bytes,
+                    file_name="relatorio_aporte.md",
+                    mime="text/markdown"
+                )
     
     # Exibir informações adicionais
     st.sidebar.markdown("---")
-    st.sidebar.markdown("**Pro Picks IA - Versão 1.0**")
+    st.sidebar.markdown("**Pro Picks IA - Versão 2.0**")
     st.sidebar.markdown("Desenvolvido como simulação do sistema Pro Picks IA")
 
 if __name__ == "__main__":
