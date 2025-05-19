@@ -102,41 +102,59 @@ def obter_dados_fundamentalistas(ticker):
         
         # 2. Demonstrações financeiras
         try:
-            dados['income_statement'] = acao.income_stmt.to_dict()
+            df = acao.income_stmt
+            if isinstance(df, pd.DataFrame):
+                dados['income_statement'] = df.reset_index().to_dict('records')
+            else:
+                dados['income_statement'] = []
         except:
-            dados['income_statement'] = {}
+            dados['income_statement'] = []
             
         try:
-            dados['balance_sheet'] = acao.balance_sheet.to_dict()
+            df = acao.balance_sheet
+            if isinstance(df, pd.DataFrame):
+                dados['balance_sheet'] = df.reset_index().to_dict('records')
+            else:
+                dados['balance_sheet'] = []
         except:
-            dados['balance_sheet'] = {}
+            dados['balance_sheet'] = []
             
         try:
-            dados['cash_flow'] = acao.cashflow.to_dict()
+            df = acao.cashflow
+            if isinstance(df, pd.DataFrame):
+                dados['cash_flow'] = df.reset_index().to_dict('records')
+            else:
+                dados['cash_flow'] = []
         except:
-            dados['cash_flow'] = {}
+            dados['cash_flow'] = []
         
         # 3. Dados históricos (2 anos)
         end_date = datetime.now()
         start_date = end_date - timedelta(days=2*365)
         try:
             hist = acao.history(start=start_date, end=end_date, interval="1d")
-            dados['historical'] = hist.to_dict('records')
+            if isinstance(hist, pd.DataFrame):
+                dados['historical'] = hist.reset_index().to_dict('records')
+            else:
+                dados['historical'] = []
         except:
             dados['historical'] = []
         
         # 4. Dividendos
         try:
-            dividends = acao.dividends.to_dict()
-            dados['dividends'] = dividends
+            dividends = acao.dividends
+            if isinstance(dividends, pd.Series):
+                dados['dividends'] = dividends.reset_index().to_dict('records')
+            else:
+                dados['dividends'] = []
         except:
-            dados['dividends'] = {}
+            dados['dividends'] = []
         
         # 5. Recomendações de analistas
         try:
             recommendations = acao.recommendations
-            if recommendations is not None:
-                dados['recommendations'] = recommendations.to_dict('records')
+            if isinstance(recommendations, pd.DataFrame):
+                dados['recommendations'] = recommendations.reset_index().to_dict('records')
             else:
                 dados['recommendations'] = []
         except:
@@ -145,8 +163,8 @@ def obter_dados_fundamentalistas(ticker):
         # 6. Ações institucionais
         try:
             institutional_holders = acao.institutional_holders
-            if institutional_holders is not None:
-                dados['institutional_holders'] = institutional_holders.to_dict('records')
+            if isinstance(institutional_holders, pd.DataFrame):
+                dados['institutional_holders'] = institutional_holders.reset_index().to_dict('records')
             else:
                 dados['institutional_holders'] = []
         except:
@@ -155,7 +173,7 @@ def obter_dados_fundamentalistas(ticker):
         # Salvar dados em arquivo JSON
         arquivo = os.path.join(DATA_DIR, f"{ticker.replace('.', '_')}.json")
         with open(arquivo, 'w', encoding='utf-8') as f:
-            json.dump(dados, f, default=str)
+            json.dump(dados, f, ensure_ascii=False, indent=2)
         
         logger.info(f"Dados de {ticker} salvos com sucesso")
         return True
