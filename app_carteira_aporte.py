@@ -1936,6 +1936,237 @@ def main():
                     mime="text/markdown"
                 )
     
+# Função para gerar motivos alternativos de recomendação
+def gerar_motivo_recomendacao_alternativo(acao, categoria, percentual_atual, cenario):
+    """Gera motivos alternativos para recomendação, garantindo critérios fundamentalistas, técnicos e macroeconômicos
+    
+    Args:
+        acao (dict): Dados da ação
+        categoria (str): Categoria da ação
+        percentual_atual (float): Percentual atual na carteira
+        cenario (str): Cenário macroeconômico atual
+        
+    Returns:
+        list: Lista de motivos para a recomendação
+    """
+    motivos = []
+    
+    # 1. Critérios Fundamentalistas (sempre incluir pelo menos um)
+    motivos_fundamentalistas = []
+    
+    if acao['Metricas'].get('ROE', 0) > 10:
+        motivos_fundamentalistas.append(f"ROE atrativo de {formatar_metrica(acao['Metricas'].get('ROE', 0), 'percentual')} demonstra eficiência na geração de lucros")
+    
+    if acao['Metricas'].get('MargemLiquida', 0) > 10:
+        motivos_fundamentalistas.append(f"Margem líquida sólida de {formatar_metrica(acao['Metricas'].get('MargemLiquida', 0), 'percentual')} indica boa eficiência operacional")
+    
+    if acao['Metricas'].get('DividaPatrimonio', 0) < 1.0:
+        motivos_fundamentalistas.append(f"Baixo endividamento com Dívida/Patrimônio de {formatar_metrica(acao['Metricas'].get('DividaPatrimonio', 0), 'decimal')} reduz riscos financeiros")
+    
+    if acao['Metricas'].get('PL', 0) < 15 and acao['Metricas'].get('PL', 0) > 0:
+        motivos_fundamentalistas.append(f"Múltiplo P/L atrativo de {formatar_metrica(acao['Metricas'].get('PL', 0), 'decimal')} sugere possível subavaliação")
+    
+    if acao['Metricas'].get('PVP', 0) < 2.0 and acao['Metricas'].get('PVP', 0) > 0:
+        motivos_fundamentalistas.append(f"P/VP de {formatar_metrica(acao['Metricas'].get('PVP', 0), 'decimal')} indica potencial valorização em relação ao patrimônio")
+    
+    if acao['Metricas'].get('DividendYield', 0) > 4:
+        motivos_fundamentalistas.append(f"Dividend Yield atrativo de {formatar_metrica(acao['Metricas'].get('DividendYield', 0), 'percentual')} oferece boa remuneração ao acionista")
+    
+    if acao['Metricas'].get('CrescimentoLucros', 0) > 10:
+        motivos_fundamentalistas.append(f"Crescimento de lucros de {formatar_metrica(acao['Metricas'].get('CrescimentoLucros', 0), 'percentual')} demonstra expansão consistente")
+    
+    # Garantir pelo menos um motivo fundamentalista
+    if not motivos_fundamentalistas:
+        motivos_fundamentalistas.append(f"Pontuação fundamentalista de {formatar_metrica(acao['PontuacaoFinal'], 'decimal')}/10 baseada em múltiplos critérios de avaliação")
+    
+    # 2. Critérios de Análise Técnica (sempre incluir pelo menos um)
+    motivos_tecnicos = []
+    
+    if acao['Metricas'].get('RSI', 0) < 30:
+        motivos_tecnicos.append("RSI em região de sobrevenda, indicando possível reversão de tendência")
+    elif acao['Metricas'].get('RSI', 0) > 30 and acao['Metricas'].get('RSI', 0) < 70:
+        motivos_tecnicos.append("RSI em região neutra, sugerindo estabilidade no momento")
+    
+    if acao['Metricas'].get('SMA50_200', 0) > 0:
+        motivos_tecnicos.append("Médias móveis em configuração de alta (Golden Cross), sinalizando tendência positiva")
+    
+    if acao['Metricas'].get('Volatilidade', 0) < 30:
+        motivos_tecnicos.append(f"Baixa volatilidade de {formatar_metrica(acao['Metricas'].get('Volatilidade', 0), 'percentual')} indica menor risco de oscilações bruscas")
+    
+    if acao['Metricas'].get('Momentum', 0) > 0:
+        motivos_tecnicos.append("Momentum positivo sugere continuidade da tendência de alta")
+    
+    # Garantir pelo menos um motivo técnico
+    if not motivos_tecnicos:
+        motivos_tecnicos.append("Análise técnica indica momento adequado para entrada, considerando preço atual e tendências recentes")
+    
+    # 3. Critérios Macroeconômicos (sempre incluir pelo menos um)
+    motivos_macro = []
+    
+    if "Alta" in cenario:
+        motivos_macro.append(f"Ação bem posicionada para cenário macroeconômico de {cenario}, com potencial de valorização")
+    elif "Neutra" in cenario:
+        motivos_macro.append(f"Perfil defensivo adequado ao cenário macroeconômico {cenario}, oferecendo equilíbrio entre risco e retorno")
+    elif "Baixa" in cenario:
+        motivos_macro.append(f"Características defensivas que ajudam a proteger o capital no atual cenário macroeconômico de {cenario}")
+    
+    if categoria == "Ações Defensivas":
+        motivos_macro.append("Setor defensivo tende a performar bem mesmo em cenários de incerteza econômica")
+    elif categoria == "Empresas Sólidas":
+        motivos_macro.append("Empresa com solidez financeira para navegar diferentes ciclos econômicos")
+    elif categoria == "Ações Baratas":
+        motivos_macro.append("Valuation atrativo oferece margem de segurança em diferentes cenários econômicos")
+    elif categoria == "Melhores Ações":
+        motivos_macro.append("Combinação de qualidade e crescimento posiciona bem a empresa para o cenário atual")
+    
+    # Garantir pelo menos um motivo macroeconômico
+    if not motivos_macro:
+        motivos_macro.append(f"Características da empresa alinhadas ao cenário macroeconômico atual de {cenario}")
+    
+    # Selecionar um motivo de cada categoria para garantir os três pilares
+    motivos.append(random.choice(motivos_fundamentalistas))
+    motivos.append(random.choice(motivos_tecnicos))
+    motivos.append(random.choice(motivos_macro))
+    
+    return motivos
+
+# Interface do Streamlit
+def main():
+    # Título e descrição
+    st.title("Pro Picks IA - Melhores Ações Brasileiras")
+    st.markdown("""
+    Esta aplicação simula o funcionamento do sistema Pro Picks IA para seleção das melhores ações brasileiras,
+    utilizando critérios fundamentalistas, análise técnica e classificação do cenário macroeconômico.
+    """)
+    
+    # Sidebar para configurações
+    st.sidebar.title("Configurações")
+    
+    # Opção para atualizar dados
+    if st.sidebar.button("Atualizar Dados"):
+        with st.spinner("Atualizando dados..."):
+            # Limpar cache de dados
+            if os.path.exists(os.path.join(DATA_DIR, "lista_acoes.json")):
+                os.remove(os.path.join(DATA_DIR, "lista_acoes.json"))
+            
+            # Obter lista atualizada
+            acoes = obter_lista_acoes()
+            st.sidebar.success(f"Dados atualizados! {len(acoes)} ações disponíveis.")
+    
+    # Classificação do cenário macroeconômico
+    cenario = classificar_cenario_macroeconomico()
+    
+    # Perfil do investidor
+    perfil = st.sidebar.selectbox(
+        "Perfil do Investidor",
+        ["Conservador", "Moderado", "Agressivo"],
+        index=1,  # Default: Moderado
+        help="Selecione seu perfil de investidor para ajustar as recomendações"
+    )
+    
+    # Ajuste de pesos
+    st.sidebar.subheader("Ajuste de Pesos dos Critérios")
+    st.sidebar.markdown("Defina a importância de cada critério (1-10)")
+    
+    # Obter pesos padrão
+    pesos_padrao = obter_pesos_padrao()
+    
+    # Permitir ajuste de pesos
+    pesos = {}
+    
+    # Criar três colunas para organizar os sliders
+    col1, col2, col3 = st.sidebar.columns(3)
+    
+    with col1:
+        st.markdown("**Lucratividade**")
+        pesos['ROE'] = st.slider("ROE", 1, 10, pesos_padrao['ROE'])
+        pesos['ROIC'] = st.slider("ROIC", 1, 10, pesos_padrao['ROIC'])
+    
+    with col2:
+        st.markdown("**Avaliação**")
+        pesos['PL'] = st.slider("P/L", 1, 10, pesos_padrao['PL'])
+        pesos['PVP'] = st.slider("P/VP", 1, 10, pesos_padrao['PVP'])
+    
+    with col3:
+        st.markdown("**Saúde Financeira**")
+        pesos['DividaPatrimonio'] = st.slider("Dívida/Patrimônio", 1, 10, pesos_padrao['DividaPatrimonio'])
+        pesos['DividendYield'] = st.slider("Dividend Yield", 1, 10, pesos_padrao['DividendYield'])
+    
+    # Outros pesos mantidos como padrão
+    for criterio, peso in pesos_padrao.items():
+        if criterio not in pesos:
+            pesos[criterio] = peso
+    
+    # Opção para selecionar modo de análise
+    st.sidebar.subheader("Modo de Análise")
+    modo_analise = st.sidebar.radio(
+        "Escolha o modo de análise:",
+        ["Automático (Top Ações)", "Carteira Personalizada"],
+        help="No modo automático, analisamos as melhores ações do mercado. No modo personalizado, você pode inserir os tickers da sua carteira."
+    )
+    
+    # Número de ações a analisar (no modo automático)
+    num_acoes = 10
+    if modo_analise == "Automático (Top Ações)":
+        num_acoes = st.sidebar.slider(
+            "Número de ações a analisar",
+            min_value=5,
+            max_value=50,
+            value=10,
+            step=5,
+            help="Selecione quantas ações deseja analisar. Um número maior pode levar mais tempo para processar."
+        )
+    
+    # Campo para inserir tickers da carteira (no modo personalizado)
+    tickers_personalizados = []
+    carteira_atual = {}
+    
+    if modo_analise == "Carteira Personalizada":
+        st.sidebar.subheader("Sua Carteira Atual")
+        
+        # Opção para inserir tickers e percentuais
+        st.sidebar.markdown("""
+        Insira os tickers da sua carteira e os percentuais atuais (um por linha).
+        Exemplo:
+        ```
+        PETR4 15
+        VALE3 20
+        ITUB4 10
+        ```
+        """)
+        
+        tickers_input = st.sidebar.text_area(
+            "Tickers e percentuais da carteira",
+            help="Formato: TICKER PERCENTUAL (um por linha)"
+        )
+        
+        if tickers_input:
+            # Processar os tickers e percentuais inseridos
+            linhas = tickers_input.strip().split('\n')
+            for linha in linhas:
+                # Dividir a linha em ticker e percentual
+                partes = linha.strip().split()
+                if len(partes) >= 2:
+                    ticker_limpo = partes[0].strip().replace(',', '')
+                    try:
+                        percentual = float(partes[1].strip().replace(',', '.'))
+                        ticker_validado = validar_ticker(ticker_limpo)
+                        if ticker_validado:
+                            tickers_personalizados.append(ticker_validado)
+                            carteira_atual[ticker_validado] = percentual
+                    except ValueError:
+                        st.sidebar.warning(f"Percentual inválido para {ticker_limpo}")
+        
+        # Valor do aporte
+        valor_aporte = st.sidebar.number_input(
+            "Valor do Aporte (R$)",
+            min_value=100.0,
+            max_value=1000000.0,
+            value=1000.0,
+            step=100.0,
+            help="Valor que você deseja investir"
+        )
+    
     # Exibir informações adicionais
     st.sidebar.markdown("---")
     st.sidebar.markdown("**Pro Picks IA - Versão 2.0**")
@@ -1943,12 +2174,6 @@ def main():
 
 if __name__ == "__main__":
     main()
-
-def gerar_motivo_recomendacao_alternativo(acao, categoria, percentual_atual, cenario):
-    """Gera motivos alternativos para recomendação, garantindo critérios fundamentalistas, técnicos e macroeconômicos
-    
-    Args:
-        acao (dict): Dados da ação
         categoria (str): Categoria da ação
         percentual_atual (float): Percentual atual na carteira
         cenario (str): Cenário macroeconômico atual
