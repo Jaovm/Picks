@@ -2173,3 +2173,92 @@ def main():
     st.sidebar.markdown("Desenvolvido como simulação do sistema Pro Picks IA")
 
 if __name__ == "__main__":
+
+        categoria (str): Categoria da ação
+        percentual_atual (float): Percentual atual na carteira
+        cenario (str): Cenário macroeconômico atual
+        
+    Returns:
+        list: Lista de motivos para a recomendação
+    main()
+    """
+    motivos = []
+    
+    # 1. Critérios Fundamentalistas (sempre incluir pelo menos um)
+    motivos_fundamentalistas = []
+    
+    if acao['Metricas'].get('ROE', 0) > 10:
+        motivos_fundamentalistas.append(f"ROE atrativo de {formatar_metrica(acao['Metricas'].get('ROE', 0), 'percentual')} demonstra eficiência na geração de lucros")
+    
+    if acao['Metricas'].get('MargemLiquida', 0) > 10:
+        motivos_fundamentalistas.append(f"Margem líquida sólida de {formatar_metrica(acao['Metricas'].get('MargemLiquida', 0), 'percentual')} indica boa eficiência operacional")
+    
+    if acao['Metricas'].get('DividaPatrimonio', 0) < 1.0:
+        motivos_fundamentalistas.append(f"Baixo endividamento com Dívida/Patrimônio de {formatar_metrica(acao['Metricas'].get('DividaPatrimonio', 0), 'decimal')} reduz riscos financeiros")
+    
+    if acao['Metricas'].get('PL', 0) < 15 and acao['Metricas'].get('PL', 0) > 0:
+        motivos_fundamentalistas.append(f"Múltiplo P/L atrativo de {formatar_metrica(acao['Metricas'].get('PL', 0), 'decimal')} sugere possível subavaliação")
+    
+    if acao['Metricas'].get('PVP', 0) < 2.0 and acao['Metricas'].get('PVP', 0) > 0:
+        motivos_fundamentalistas.append(f"P/VP de {formatar_metrica(acao['Metricas'].get('PVP', 0), 'decimal')} indica potencial valorização em relação ao patrimônio")
+    
+    if acao['Metricas'].get('DividendYield', 0) > 4:
+        motivos_fundamentalistas.append(f"Dividend Yield atrativo de {formatar_metrica(acao['Metricas'].get('DividendYield', 0), 'percentual')} oferece boa remuneração ao acionista")
+    
+    if acao['Metricas'].get('CrescimentoLucros', 0) > 10:
+        motivos_fundamentalistas.append(f"Crescimento de lucros de {formatar_metrica(acao['Metricas'].get('CrescimentoLucros', 0), 'percentual')} demonstra expansão consistente")
+    
+    # Garantir pelo menos um motivo fundamentalista
+    if not motivos_fundamentalistas:
+        motivos_fundamentalistas.append(f"Pontuação fundamentalista de {formatar_metrica(acao['PontuacaoFinal'], 'decimal')}/10 baseada em múltiplos critérios de avaliação")
+    
+    # 2. Critérios de Análise Técnica (sempre incluir pelo menos um)
+    motivos_tecnicos = []
+    
+    if acao['Metricas'].get('RSI', 0) < 30:
+        motivos_tecnicos.append("RSI em região de sobrevenda, indicando possível reversão de tendência")
+    elif acao['Metricas'].get('RSI', 0) > 30 and acao['Metricas'].get('RSI', 0) < 70:
+        motivos_tecnicos.append("RSI em região neutra, sugerindo estabilidade no momento")
+    
+    if acao['Metricas'].get('SMA50_200', 0) > 0:
+        motivos_tecnicos.append("Médias móveis em configuração de alta (Golden Cross), sinalizando tendência positiva")
+    
+    if acao['Metricas'].get('Volatilidade', 0) < 30:
+        motivos_tecnicos.append(f"Baixa volatilidade de {formatar_metrica(acao['Metricas'].get('Volatilidade', 0), 'percentual')} indica menor risco de oscilações bruscas")
+    
+    if acao['Metricas'].get('Momentum', 0) > 0:
+        motivos_tecnicos.append("Momentum positivo sugere continuidade da tendência de alta")
+    
+    # Garantir pelo menos um motivo técnico
+    if not motivos_tecnicos:
+        motivos_tecnicos.append("Análise técnica indica momento adequado para entrada, considerando preço atual e tendências recentes")
+    
+    # 3. Critérios Macroeconômicos (sempre incluir pelo menos um)
+    motivos_macro = []
+    
+    if "Alta" in cenario:
+        motivos_macro.append(f"Ação bem posicionada para cenário macroeconômico de {cenario}, com potencial de valorização")
+    elif "Neutra" in cenario:
+        motivos_macro.append(f"Perfil defensivo adequado ao cenário macroeconômico {cenario}, oferecendo equilíbrio entre risco e retorno")
+    elif "Baixa" in cenario:
+        motivos_macro.append(f"Características defensivas que ajudam a proteger o capital no atual cenário macroeconômico de {cenario}")
+    
+    if categoria == "Ações Defensivas":
+        motivos_macro.append("Setor defensivo tende a performar bem mesmo em cenários de incerteza econômica")
+    elif categoria == "Empresas Sólidas":
+        motivos_macro.append("Empresa com solidez financeira para navegar diferentes ciclos econômicos")
+    elif categoria == "Ações Baratas":
+        motivos_macro.append("Valuation atrativo oferece margem de segurança em diferentes cenários econômicos")
+    elif categoria == "Melhores Ações":
+        motivos_macro.append("Combinação de qualidade e crescimento posiciona bem a empresa para o cenário atual")
+    
+    # Garantir pelo menos um motivo macroeconômico
+    if not motivos_macro:
+        motivos_macro.append(f"Características da empresa alinhadas ao cenário macroeconômico atual de {cenario}")
+    
+    # Selecionar um motivo de cada categoria para garantir os três pilares
+    motivos.append(random.choice(motivos_fundamentalistas))
+    motivos.append(random.choice(motivos_tecnicos))
+    motivos.append(random.choice(motivos_macro))
+    
+    return motivos
