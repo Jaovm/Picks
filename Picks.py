@@ -133,7 +133,7 @@ def coletar_dados_acao(ticker):
             
             # 3. Dados históricos (2 anos)
             end_date = datetime.now()
-            start_date = end_date - timedelta(days=2*365)
+            start_date = end_date - timedelta(days=5*365)
             try:
                 hist = acao.history(start=start_date, end=end_date, interval="1d")
                 if hist is not None and not hist.empty:
@@ -1063,7 +1063,7 @@ def analisar_carteira_para_aporte(resultados, carteira_atual, perfil, cenario, v
             acoes_recomendadas = []
             if categoria in acoes_por_categoria and len(acoes_por_categoria[categoria]) > 0:
                 # Pegar as 3 melhores ações da categoria
-                melhores_acoes = acoes_por_categoria[categoria][:3]
+                melhores_acoes = acoes_por_categoria[categoria][:5]
                 
                 # Verificar quais dessas ações já estão na carteira e quais são novas
                 acoes_existentes = [a for a in melhores_acoes if a['Ticker'] in carteira_atual]
@@ -1079,7 +1079,7 @@ def analisar_carteira_para_aporte(resultados, carteira_atual, perfil, cenario, v
                     acoes_recomendadas.append(acao)
                 
                 # Limitar a 3 recomendações por categoria
-                acoes_recomendadas = acoes_recomendadas[:3]
+                acoes_recomendadas = acoes_recomendadas[:5]
                 
                 # Distribuir o valor da categoria entre as ações recomendadas
                 if acoes_recomendadas:
@@ -1103,13 +1103,13 @@ def analisar_carteira_para_aporte(resultados, carteira_atual, perfil, cenario, v
         for categoria, acoes in acoes_por_categoria.items():
             if acoes:
                 # Pegar as 2 melhores ações de cada categoria
-                melhores_acoes_geral.extend(acoes[:2])
+                melhores_acoes_geral.extend(acoes[:5])
         
         # Ordenar por pontuação final (combinação de critérios fundamentalistas, técnicos e macroeconômicos)
         melhores_acoes_geral = sorted(melhores_acoes_geral, key=lambda x: x['PontuacaoFinal'], reverse=True)
         
         # Limitar a 5 recomendações no total
-        melhores_acoes_geral = melhores_acoes_geral[:5]
+        melhores_acoes_geral = melhores_acoes_geral[:10]
         
         # Distribuir o valor do aporte igualmente entre as ações selecionadas
         if melhores_acoes_geral:
