@@ -2174,7 +2174,13 @@ def main():
 
 if __name__ == "__main__":
     main()
-    """
+        categoria (str): Categoria da ação
+        percentual_atual (float): Percentual atual na carteira
+        cenario (str): Cenário macroeconômico atual
+        
+    Returns:
+        list: Lista de motivos para a recomendação
+
     motivos = []
     
     # 1. Critérios Fundamentalistas (sempre incluir pelo menos um)
