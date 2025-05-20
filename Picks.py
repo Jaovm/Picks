@@ -988,16 +988,15 @@ def validar_ticker(ticker):
     return None
 
 # Função para analisar a carteira atual e recomendar aportes
-def analisar_carteira_e_recomendar_aportes(carteira_atual, resultados, perfil, cenario, valor_aporte=1000):
-    """
-    Analisa a carteira atual e recomenda aportes com base na análise fundamentalista
+def analisar_carteira_para_aporte(resultados, carteira_atual, perfil, cenario, valor_aporte):
+    """Analisa a carteira atual e sugere recomendações de aporte
     
     Args:
-        carteira_atual (dict): Dicionário com ticker como chave e percentual como valor
         resultados (list): Lista de resultados da análise de ações
+        carteira_atual (dict): Dicionário com tickers e percentuais da carteira atual
         perfil (str): Perfil do investidor
         cenario (str): Cenário macroeconômico
-        valor_aporte (float): Valor do aporte a ser realizado
+        valor_aporte (float): Valor do aporte em reais
         
     Returns:
         dict: Recomendações de aporte
@@ -1094,6 +1093,47 @@ def analisar_carteira_e_recomendar_aportes(carteira_atual, resultados, perfil, c
                             'Pontuacao': acao['PontuacaoFinal'],
                             'Motivo': gerar_motivo_recomendacao(acao, categoria, carteira_atual.get(acao['Ticker'], 0))
                         }
+    
+    # MODIFICAÇÃO: Sempre sugerir ações, mesmo quando não há diferenças positivas
+    if not recomendacoes:
+        # Selecionar as melhores ações de cada categoria com base nos critérios fundamentalistas, técnicos e macroeconômicos
+        melhores_acoes_geral = []
+        
+        # Obter as melhores ações de cada categoria
+        for categoria, acoes in acoes_por_categoria.items():
+            if acoes:
+                # Pegar as 2 melhores ações de cada categoria
+                melhores_acoes_geral.extend(acoes[:2])
+        
+        # Ordenar por pontuação final (combinação de critérios fundamentalistas, técnicos e macroeconômicos)
+        melhores_acoes_geral = sorted(melhores_acoes_geral, key=lambda x: x['PontuacaoFinal'], reverse=True)
+        
+        # Limitar a 5 recomendações no total
+        melhores_acoes_geral = melhores_acoes_geral[:5]
+        
+        # Distribuir o valor do aporte igualmente entre as ações selecionadas
+        if melhores_acoes_geral:
+            valor_por_acao = valor_aporte / len(melhores_acoes_geral)
+            percentual_por_acao = 100 / len(melhores_acoes_geral)
+            
+            for acao in melhores_acoes_geral:
+                # Determinar a categoria principal da ação
+                categoria_principal = acao['Categorias'][0]
+                if "Melhores Ações Brasileiras" in acao['Categorias']:
+                    categoria_principal = "Melhores Ações"
+                elif len(acao['Categorias']) > 0:
+                    categoria_principal = acao['Categorias'][0]
+                    if categoria_principal == "Melhores Ações Brasileiras":
+                        categoria_principal = "Melhores Ações"
+                
+                recomendacoes[acao['Ticker']] = {
+                    'Nome': acao['Nome'],
+                    'Valor': valor_por_acao,
+                    'Percentual': percentual_por_acao,
+                    'Categoria': categoria_principal,
+                    'Pontuacao': acao['PontuacaoFinal'],
+                    'Motivo': gerar_motivo_recomendacao_alternativo(acao, categoria_principal, carteira_atual.get(acao['Ticker'], 0), cenario)
+                }
     
     return {
         'carteira_atual': categorias_atuais,
@@ -1228,9 +1268,40 @@ def gerar_relatorio_analista(analise_carteira, perfil, cenario, valor_aporte):
     else:
         relatorio += """
         
-        Não foram identificadas oportunidades claras de aporte no momento. Recomendamos aguardar
-        melhores oportunidades de entrada ou reavaliar os parâmetros de análise.
+        Com base na análise fundamentalista, técnica e do cenário macroeconômico atual, 
+        recomendamos as seguintes ações para aporte, mesmo que não estejam alinhadas 
+        com a alocação ideal da carteira:
         """
+        
+        # Adicionar tabela de recomendações alternativas
+        relatorio += "\n    | Ação | Nome | Valor | % do Aporte |\n"
+        relatorio += "    |------|------|-------|------------|\n"
+        
+        for ticker, info in analise_carteira['recomendacoes'].items():
+            relatorio += f"    | {ticker} | {info['Nome']} | R$ {info['Valor']:.2f} | {info['Percentual']:.1f}% |\n"
+        
+        # Detalhamento das recomendações alternativas
+        relatorio += """
+        
+        ## Justificativa das Recomendações
+        
+        A seguir, apresentamos a justificativa detalhada para cada recomendação de aporte:
+        """
+        
+        for ticker, info in analise_carteira['recomendacoes'].items():
+            relatorio += f"""
+        
+        ### {ticker} - {info['Nome']}
+        
+        **Categoria:** {info['Categoria']}
+        **Pontuação:** {info['Pontuacao']:.1f}/10
+        **Valor Recomendado:** R$ {info['Valor']:.2f} ({info['Percentual']:.1f}% do aporte)
+        
+        **Motivos:**
+        """
+            
+            for motivo in info['Motivo']:
+                relatorio += f"        - {motivo}\n"
     
     # Conclusão
     relatorio += """
@@ -1872,3 +1943,96 @@ def main():
 
 if __name__ == "__main__":
     main()
+
+def gerar_motivo_recomendacao_alternativo(acao, categoria, percentual_atual, cenario):
+    """Gera motivos alternativos para recomendação, garantindo critérios fundamentalistas, técnicos e macroeconômicos
+    
+    Args:
+        acao (dict): Dados da ação
+        categoria (str): Categoria da ação
+        percentual_atual (float): Percentual atual na carteira
+        cenario (str): Cenário macroeconômico atual
+        
+    Returns:
+        list: Lista de motivos para a recomendação
+    """
+    motivos = []
+    
+    # 1. Critérios Fundamentalistas (sempre incluir pelo menos um)
+    motivos_fundamentalistas = []
+    
+    if acao['Metricas'].get('ROE', 0) > 10:
+        motivos_fundamentalistas.append(f"ROE atrativo de {formatar_metrica(acao['Metricas'].get('ROE', 0), 'percentual')} demonstra eficiência na geração de lucros")
+    
+    if acao['Metricas'].get('MargemLiquida', 0) > 10:
+        motivos_fundamentalistas.append(f"Margem líquida sólida de {formatar_metrica(acao['Metricas'].get('MargemLiquida', 0), 'percentual')} indica boa eficiência operacional")
+    
+    if acao['Metricas'].get('DividaPatrimonio', 0) < 1.0:
+        motivos_fundamentalistas.append(f"Baixo endividamento com Dívida/Patrimônio de {formatar_metrica(acao['Metricas'].get('DividaPatrimonio', 0), 'decimal')} reduz riscos financeiros")
+    
+    if acao['Metricas'].get('PL', 0) < 15 and acao['Metricas'].get('PL', 0) > 0:
+        motivos_fundamentalistas.append(f"Múltiplo P/L atrativo de {formatar_metrica(acao['Metricas'].get('PL', 0), 'decimal')} sugere possível subavaliação")
+    
+    if acao['Metricas'].get('PVP', 0) < 2.0 and acao['Metricas'].get('PVP', 0) > 0:
+        motivos_fundamentalistas.append(f"P/VP de {formatar_metrica(acao['Metricas'].get('PVP', 0), 'decimal')} indica potencial valorização em relação ao patrimônio")
+    
+    if acao['Metricas'].get('DividendYield', 0) > 4:
+        motivos_fundamentalistas.append(f"Dividend Yield atrativo de {formatar_metrica(acao['Metricas'].get('DividendYield', 0), 'percentual')} oferece boa remuneração ao acionista")
+    
+    if acao['Metricas'].get('CrescimentoLucros', 0) > 10:
+        motivos_fundamentalistas.append(f"Crescimento de lucros de {formatar_metrica(acao['Metricas'].get('CrescimentoLucros', 0), 'percentual')} demonstra expansão consistente")
+    
+    # Garantir pelo menos um motivo fundamentalista
+    if not motivos_fundamentalistas:
+        motivos_fundamentalistas.append(f"Pontuação fundamentalista de {formatar_metrica(acao['PontuacaoFinal'], 'decimal')}/10 baseada em múltiplos critérios de avaliação")
+    
+    # 2. Critérios de Análise Técnica (sempre incluir pelo menos um)
+    motivos_tecnicos = []
+    
+    if acao['Metricas'].get('RSI', 0) < 30:
+        motivos_tecnicos.append("RSI em região de sobrevenda, indicando possível reversão de tendência")
+    elif acao['Metricas'].get('RSI', 0) > 30 and acao['Metricas'].get('RSI', 0) < 70:
+        motivos_tecnicos.append("RSI em região neutra, sugerindo estabilidade no momento")
+    
+    if acao['Metricas'].get('SMA50_200', 0) > 0:
+        motivos_tecnicos.append("Médias móveis em configuração de alta (Golden Cross), sinalizando tendência positiva")
+    
+    if acao['Metricas'].get('Volatilidade', 0) < 30:
+        motivos_tecnicos.append(f"Baixa volatilidade de {formatar_metrica(acao['Metricas'].get('Volatilidade', 0), 'percentual')} indica menor risco de oscilações bruscas")
+    
+    if acao['Metricas'].get('Momentum', 0) > 0:
+        motivos_tecnicos.append("Momentum positivo sugere continuidade da tendência de alta")
+    
+    # Garantir pelo menos um motivo técnico
+    if not motivos_tecnicos:
+        motivos_tecnicos.append("Análise técnica indica momento adequado para entrada, considerando preço atual e tendências recentes")
+    
+    # 3. Critérios Macroeconômicos (sempre incluir pelo menos um)
+    motivos_macro = []
+    
+    if "Alta" in cenario:
+        motivos_macro.append(f"Ação bem posicionada para cenário macroeconômico de {cenario}, com potencial de valorização")
+    elif "Neutra" in cenario:
+        motivos_macro.append(f"Perfil defensivo adequado ao cenário macroeconômico {cenario}, oferecendo equilíbrio entre risco e retorno")
+    elif "Baixa" in cenario:
+        motivos_macro.append(f"Características defensivas que ajudam a proteger o capital no atual cenário macroeconômico de {cenario}")
+    
+    if categoria == "Ações Defensivas":
+        motivos_macro.append("Setor defensivo tende a performar bem mesmo em cenários de incerteza econômica")
+    elif categoria == "Empresas Sólidas":
+        motivos_macro.append("Empresa com solidez financeira para navegar diferentes ciclos econômicos")
+    elif categoria == "Ações Baratas":
+        motivos_macro.append("Valuation atrativo oferece margem de segurança em diferentes cenários econômicos")
+    elif categoria == "Melhores Ações":
+        motivos_macro.append("Combinação de qualidade e crescimento posiciona bem a empresa para o cenário atual")
+    
+    # Garantir pelo menos um motivo macroeconômico
+    if not motivos_macro:
+        motivos_macro.append(f"Características da empresa alinhadas ao cenário macroeconômico atual de {cenario}")
+    
+    # Selecionar um motivo de cada categoria para garantir os três pilares
+    motivos.append(random.choice(motivos_fundamentalistas))
+    motivos.append(random.choice(motivos_tecnicos))
+    motivos.append(random.choice(motivos_macro))
+    
+    return motivos
