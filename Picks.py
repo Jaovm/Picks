@@ -1487,19 +1487,7 @@ def main():
             help="Informe o valor que deseja aportar para receber recomendações personalizadas"
         )
     
-    # Botão para iniciar análise
-    if st.sidebar.button("Analisar Ações"):
-        # Obter lista de ações
-        if modo_analise == "Automático (Top Ações)":
-            acoes = obter_lista_acoes()
-            # Limitar ao número selecionado
-            acoes = acoes[:num_acoes]
-        else:
-            # Usar tickers personalizados
-            acoes = tickers_personalizados
-            if not acoes:
-                st.error("Por favor, insira pelo menos um ticker válido para análise.")
-                return
+
         
         # Mostrar progresso
         progress_bar = st.progress(0)
@@ -2166,7 +2154,20 @@ def main():
             step=100.0,
             help="Valor que você deseja investir"
         )
-    
+
+        # Botão para iniciar análise
+    if st.sidebar.button("Analisar Ações"):
+        # Obter lista de ações
+        if modo_analise == "Automático (Top Ações)":
+            acoes = obter_lista_acoes()
+            # Limitar ao número selecionado
+            acoes = acoes[:num_acoes]
+        else:
+            # Usar tickers personalizados
+            acoes = tickers_personalizados
+            if not acoes:
+                st.error("Por favor, insira pelo menos um ticker válido para análise.")
+                return
     # Exibir informações adicionais
     st.sidebar.markdown("---")
     st.sidebar.markdown("**Pro Picks IA - Versão 2.0**")
