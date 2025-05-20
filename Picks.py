@@ -1487,7 +1487,19 @@ def main():
             help="Informe o valor que deseja aportar para receber recomendações personalizadas"
         )
     
-
+    # Botão para iniciar análise
+    if st.sidebar.button("Analisar Ações"):
+        # Obter lista de ações
+        if modo_analise == "Automático (Top Ações)":
+            acoes = obter_lista_acoes()
+            # Limitar ao número selecionado
+            acoes = acoes[:num_acoes]
+        else:
+            # Usar tickers personalizados
+            acoes = tickers_personalizados
+            if not acoes:
+                st.error("Por favor, insira pelo menos um ticker válido para análise.")
+                return
         
         # Mostrar progresso
         progress_bar = st.progress(0)
@@ -2018,160 +2030,6 @@ def gerar_motivo_recomendacao_alternativo(acao, categoria, percentual_atual, cen
     
     return motivos
 
-# Interface do Streamlit
-def main():
-    # Título e descrição
-    st.title("Pro Picks IA - Melhores Ações Brasileiras")
-    st.markdown("""
-    Esta aplicação simula o funcionamento do sistema Pro Picks IA para seleção das melhores ações brasileiras,
-    utilizando critérios fundamentalistas, análise técnica e classificação do cenário macroeconômico.
-    """)
-    
-    # Sidebar para configurações
-    st.sidebar.title("Configurações")
-    
-    # Opção para atualizar dados
-    if st.sidebar.button("Atualizar Dados"):
-        with st.spinner("Atualizando dados..."):
-            # Limpar cache de dados
-            if os.path.exists(os.path.join(DATA_DIR, "lista_acoes.json")):
-                os.remove(os.path.join(DATA_DIR, "lista_acoes.json"))
-            
-            # Obter lista atualizada
-            acoes = obter_lista_acoes()
-            st.sidebar.success(f"Dados atualizados! {len(acoes)} ações disponíveis.")
-    
-    # Classificação do cenário macroeconômico
-    cenario = classificar_cenario_macroeconomico()
-    
-    # Perfil do investidor
-    perfil = st.sidebar.selectbox(
-        "Perfil do Investidor",
-        ["Conservador", "Moderado", "Agressivo"],
-        index=1,  # Default: Moderado
-        help="Selecione seu perfil de investidor para ajustar as recomendações"
-    )
-    
-    # Ajuste de pesos
-    st.sidebar.subheader("Ajuste de Pesos dos Critérios")
-    st.sidebar.markdown("Defina a importância de cada critério (1-10)")
-    
-    # Obter pesos padrão
-    pesos_padrao = obter_pesos_padrao()
-    
-    # Permitir ajuste de pesos
-    pesos = {}
-    
-    # Criar três colunas para organizar os sliders
-    col1, col2, col3 = st.sidebar.columns(3)
-    
-    with col1:
-        st.markdown("**Lucratividade**")
-        pesos['ROE'] = st.slider("ROE", 1, 10, pesos_padrao['ROE'])
-        pesos['ROIC'] = st.slider("ROIC", 1, 10, pesos_padrao['ROIC'])
-    
-    with col2:
-        st.markdown("**Avaliação**")
-        pesos['PL'] = st.slider("P/L", 1, 10, pesos_padrao['PL'])
-        pesos['PVP'] = st.slider("P/VP", 1, 10, pesos_padrao['PVP'])
-    
-    with col3:
-        st.markdown("**Saúde Financeira**")
-        pesos['DividaPatrimonio'] = st.slider("Dívida/Patrimônio", 1, 10, pesos_padrao['DividaPatrimonio'])
-        pesos['DividendYield'] = st.slider("Dividend Yield", 1, 10, pesos_padrao['DividendYield'])
-    
-    # Outros pesos mantidos como padrão
-    for criterio, peso in pesos_padrao.items():
-        if criterio not in pesos:
-            pesos[criterio] = peso
-    
-    # Opção para selecionar modo de análise
-    st.sidebar.subheader("Modo de Análise")
-    modo_analise = st.sidebar.radio(
-        "Escolha o modo de análise:",
-        ["Automático (Top Ações)", "Carteira Personalizada"],
-        help="No modo automático, analisamos as melhores ações do mercado. No modo personalizado, você pode inserir os tickers da sua carteira."
-    )
-    
-    # Número de ações a analisar (no modo automático)
-    num_acoes = 10
-    if modo_analise == "Automático (Top Ações)":
-        num_acoes = st.sidebar.slider(
-            "Número de ações a analisar",
-            min_value=5,
-            max_value=50,
-            value=10,
-            step=5,
-            help="Selecione quantas ações deseja analisar. Um número maior pode levar mais tempo para processar."
-        )
-    
-    # Campo para inserir tickers da carteira (no modo personalizado)
-    tickers_personalizados = []
-    carteira_atual = {}
-    
-    if modo_analise == "Carteira Personalizada":
-        st.sidebar.subheader("Sua Carteira Atual")
-        
-        # Opção para inserir tickers e percentuais
-        st.sidebar.markdown("""
-        Insira os tickers da sua carteira e os percentuais atuais (um por linha).
-        Exemplo:
-        ```
-        PETR4 15
-        VALE3 20
-        ITUB4 10
-        ```
-        """)
-        
-        tickers_input = st.sidebar.text_area(
-            "Tickers e percentuais da carteira",
-            help="Formato: TICKER PERCENTUAL (um por linha)"
-        )
-        
-        if tickers_input:
-            # Processar os tickers e percentuais inseridos
-            linhas = tickers_input.strip().split('\n')
-            for linha in linhas:
-                # Dividir a linha em ticker e percentual
-                partes = linha.strip().split()
-                if len(partes) >= 2:
-                    ticker_limpo = partes[0].strip().replace(',', '')
-                    try:
-                        percentual = float(partes[1].strip().replace(',', '.'))
-                        ticker_validado = validar_ticker(ticker_limpo)
-                        if ticker_validado:
-                            tickers_personalizados.append(ticker_validado)
-                            carteira_atual[ticker_validado] = percentual
-                    except ValueError:
-                        st.sidebar.warning(f"Percentual inválido para {ticker_limpo}")
-        
-        # Valor do aporte
-        valor_aporte = st.sidebar.number_input(
-            "Valor do Aporte (R$)",
-            min_value=100.0,
-            max_value=1000000.0,
-            value=1000.0,
-            step=100.0,
-            help="Valor que você deseja investir"
-        )
-
-        # Botão para iniciar análise
-    if st.sidebar.button("Analisar Ações"):
-        # Obter lista de ações
-        if modo_analise == "Automático (Top Ações)":
-            acoes = obter_lista_acoes()
-            # Limitar ao número selecionado
-            acoes = acoes[:num_acoes]
-        else:
-            # Usar tickers personalizados
-            acoes = tickers_personalizados
-            if not acoes:
-                st.error("Por favor, insira pelo menos um ticker válido para análise.")
-                return
-    # Exibir informações adicionais
-    st.sidebar.markdown("---")
-    st.sidebar.markdown("**Pro Picks IA - Versão 2.0**")
-    st.sidebar.markdown("Desenvolvido como simulação do sistema Pro Picks IA")
-
 if __name__ == "__main__":
     main()
+        
