@@ -1837,9 +1837,9 @@ def main():
                 st.subheader("Recomendação de Aporte Personalizada")
                 
                 # Analisar carteira e gerar recomendações
-                analise_carteira = analisar_carteira_e_recomendar_aportes(
+                analise_carteira = analisar_carteira_para_aporte(
+                    resultados,
                     carteira_atual, 
-                    resultados, 
                     perfil, 
                     cenario, 
                     valor_aporte
