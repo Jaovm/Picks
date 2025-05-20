@@ -242,7 +242,7 @@ def obter_dados_ibovespa():
         with st.spinner("Coletando dados históricos do Ibovespa..."):
             ibov = yf.Ticker("^BVSP")
             end_date = datetime.now()
-            start_date = end_date - timedelta(days=2*365)
+            start_date = end_date - timedelta(days=5*365)
             hist = ibov.history(start=start_date, end=end_date, interval="1d")
             
             # Salvar dados em arquivo CSV
