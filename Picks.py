@@ -2173,13 +2173,6 @@ def main():
     st.sidebar.markdown("Desenvolvido como simulação do sistema Pro Picks IA")
 
 if __name__ == "__main__":
-
-        categoria (str): Categoria da ação
-        percentual_atual (float): Percentual atual na carteira
-        cenario (str): Cenário macroeconômico atual
-        
-    Returns:
-        list: Lista de motivos para a recomendação
     main()
     """
     motivos = []
