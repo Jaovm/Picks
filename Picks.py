@@ -2173,4 +2173,3 @@ def main():
     st.sidebar.markdown("Desenvolvido como simulação do sistema Pro Picks IA")
 
 if __name__ == "__main__":
-    main()
