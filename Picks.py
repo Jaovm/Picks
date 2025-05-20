@@ -1808,7 +1808,7 @@ def main():
                 else:
                     categoria_busca = categoria
                 
-                carteira = criar_carteira_recomendada(resultados, categoria_busca, max_acoes=3)
+                carteira = criar_carteira_recomendada(resultados, categoria_busca, max_acoes=5)
                 carteiras_por_categoria[categoria] = carteira
             
             # Exibir carteiras
