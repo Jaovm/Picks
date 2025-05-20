@@ -1938,46 +1938,32 @@ def main():
     
 # Função para gerar motivos alternativos de recomendação
 def gerar_motivo_recomendacao_alternativo(acao, categoria, percentual_atual, cenario):
-    """Gera motivos alternativos para recomendação, garantindo critérios fundamentalistas, técnicos e macroeconômicos
-    
-    Args:
-        acao (dict): Dados da ação
-        categoria (str): Categoria da ação
-        percentual_atual (float): Percentual atual na carteira
-        cenario (str): Cenário macroeconômico atual
-        
-    Returns:
-        list: Lista de motivos para a recomendação
-    """
     motivos = []
-    
-    # 1. Critérios Fundamentalistas (sempre incluir pelo menos um)
     motivos_fundamentalistas = []
+
+    if acao['Metricas'].get('ROE') is not None and acao['Metricas']['ROE'] > 10:
+        motivos_fundamentalistas.append(f"ROE atrativo de {formatar_metrica(acao['Metricas']['ROE'], 'percentual')} demonstra eficiência na geração de lucros")
     
-    if acao['Metricas'].get('ROE', 0) > 10:
-        motivos_fundamentalistas.append(f"ROE atrativo de {formatar_metrica(acao['Metricas'].get('ROE', 0), 'percentual')} demonstra eficiência na geração de lucros")
+    if acao['Metricas'].get('MargemLiquida') is not None and acao['Metricas']['MargemLiquida'] > 10:
+        motivos_fundamentalistas.append(f"Margem líquida sólida de {formatar_metrica(acao['Metricas']['MargemLiquida'], 'percentual')} indica boa eficiência operacional")
     
-    if acao['Metricas'].get('MargemLiquida', 0) > 10:
-        motivos_fundamentalistas.append(f"Margem líquida sólida de {formatar_metrica(acao['Metricas'].get('MargemLiquida', 0), 'percentual')} indica boa eficiência operacional")
+    if acao['Metricas'].get('DividaPatrimonio') is not None and acao['Metricas']['DividaPatrimonio'] < 1.0:
+        motivos_fundamentalistas.append(f"Baixo endividamento com Dívida/Patrimônio de {formatar_metrica(acao['Metricas']['DividaPatrimonio'], 'decimal')} reduz riscos financeiros")
     
-    if acao['Metricas'].get('DividaPatrimonio', 0) < 1.0:
-        motivos_fundamentalistas.append(f"Baixo endividamento com Dívida/Patrimônio de {formatar_metrica(acao['Metricas'].get('DividaPatrimonio', 0), 'decimal')} reduz riscos financeiros")
+    if acao['Metricas'].get('PL') is not None and acao['Metricas']['PL'] < 15 and acao['Metricas']['PL'] > 0:
+        motivos_fundamentalistas.append(f"Múltiplo P/L atrativo de {formatar_metrica(acao['Metricas']['PL'], 'decimal')} sugere possível subavaliação")
     
-    if acao['Metricas'].get('PL', 0) < 15 and acao['Metricas'].get('PL', 0) > 0:
-        motivos_fundamentalistas.append(f"Múltiplo P/L atrativo de {formatar_metrica(acao['Metricas'].get('PL', 0), 'decimal')} sugere possível subavaliação")
+    if acao['Metricas'].get('PVP') is not None and acao['Metricas']['PVP'] < 2.0 and acao['Metricas']['PVP'] > 0:
+        motivos_fundamentalistas.append(f"P/VP de {formatar_metrica(acao['Metricas']['PVP'], 'decimal')} indica potencial valorização em relação ao patrimônio")
     
-    if acao['Metricas'].get('PVP', 0) < 2.0 and acao['Metricas'].get('PVP', 0) > 0:
-        motivos_fundamentalistas.append(f"P/VP de {formatar_metrica(acao['Metricas'].get('PVP', 0), 'decimal')} indica potencial valorização em relação ao patrimônio")
+    if acao['Metricas'].get('DividendYield') is not None and acao['Metricas']['DividendYield'] > 4:
+        motivos_fundamentalistas.append(f"Dividend Yield atrativo de {formatar_metrica(acao['Metricas']['DividendYield'], 'percentual')} oferece boa remuneração ao acionista")
     
-    if acao['Metricas'].get('DividendYield', 0) > 4:
-        motivos_fundamentalistas.append(f"Dividend Yield atrativo de {formatar_metrica(acao['Metricas'].get('DividendYield', 0), 'percentual')} oferece boa remuneração ao acionista")
+    crescimento = acao['Metricas'].get('CrescimentoLucros')
+    if crescimento is not None and crescimento > 10:
+        motivos_fundamentalistas.append(f"Crescimento de lucros de {formatar_metrica(crescimento, 'percentual')} demonstra expansão consistente")
     
-    if acao['Metricas'].get('CrescimentoLucros', 0) > 10:
-        motivos_fundamentalistas.append(f"Crescimento de lucros de {formatar_metrica(acao['Metricas'].get('CrescimentoLucros', 0), 'percentual')} demonstra expansão consistente")
-    
-    # Garantir pelo menos um motivo fundamentalista
-    if not motivos_fundamentalistas:
-        motivos_fundamentalistas.append(f"Pontuação fundamentalista de {formatar_metrica(acao['PontuacaoFinal'], 'decimal')}/10 baseada em múltiplos critérios de avaliação")
+    # ... (continue igual o resto da função)
     
     # 2. Critérios de Análise Técnica (sempre incluir pelo menos um)
     motivos_tecnicos = []
