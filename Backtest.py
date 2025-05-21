@@ -38,9 +38,15 @@ if st.button("Executar Backtest"):
     datas_carteira = []
     historico_pesos = []
 
-    bova11 = yf.download("BOVA11.SA", start=start_date, end=end_date)["Adj Close"].ffill()
-    bova11_qtd = 0
-    bova11_patrimonio = []
+    bova11 = yf.download("BOVA11.SA", start=start_date, end=end_date, progress=False)
+
+    try:
+        bova11 = bova11["Adj Close"].ffill()
+    except KeyError:
+        if ("BOVA11.SA", "Adj Close") in bova11.columns:
+            bova11 = bova11[("BOVA11.SA", "Adj Close")].ffill()
+        else:
+            raise ValueError("Erro: coluna 'Adj Close' não encontrada nos dados do BOVA11.")
 
     for data_aporte in datas_aporte:
         metricas = {}
